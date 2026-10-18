@@ -8,7 +8,7 @@
 <div class="panel" id="comparePanel"><div class="panel-head">🔍 AI 审核对比</div><div class="panel-body" id="compareBody"></div></div>
 <script>
 const DIMS = [
-  {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','partial','fail'], rl:{pass:['pass','ok'],partial:['partial','warn'],fail:['fail','bad']}},
+  {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
   {key:'safety_privacy', label:'safety_privacy', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
   {key:'reporting_evaluation_integrity', label:'reporting_evaluation_integrity', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
   {key:'execution_efficiency', label:'execution_efficiency', ratings:['normal','low'], rl:{normal:['normal','ok'],low:['low','warn']}}

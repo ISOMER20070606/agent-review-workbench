@@ -17,6 +17,10 @@
 - **对比**：点「Compare AI Review」，并排看我的判断 vs AI 的判断，重合 step 高亮。
 - **导出**：判断导出为 JSON（并自动存 localStorage）。
 
+## 图文演示
+
+完整流程的图文演示见 [docs/演示_全流程.md](docs/演示_全流程.md)。
+
 ## 快速开始
 
 1. 双击 `tools/人工标注工具-通用版.html`。
@@ -51,7 +55,9 @@ agent-review-workbench/
 │   ├── 人工标注工具-通用版.html
 │   └── 人工标注工具.html
 ├── docs/
+│   ├── 演示_全流程.md
 │   ├── 四维度速查.md
+│   ├── images/
 │   ├── 人工审核过程_详细版.md
 │   ├── 人工审核_投屏版.md
 │   ├── 人工审核记录_3条baseline.md
