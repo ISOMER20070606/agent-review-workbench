@@ -1,5 +1,7 @@
 # Agentic Work Review · 人工标注工作台
 
+> 版本：v1.01（左栏总结卡 + 关键动作筛选 + Diff 视图）
+
 一个用于人工复核 Coding Agent 轨迹的**本地单文件工作台**，配套一套「四维度 + 重复标注检查」的复核流程。
 
 ## 这是什么
@@ -13,6 +15,9 @@
 - **加载**：通用版支持一次选多个 JSON（原始轨迹 + annotation），自动识别、按 instance_id 配对；也支持拖拽。
 - **看任务**：任务描述可一键切换中文翻译。
 - **看流水**：每条消息带中文步骤提示（查看文件 / 搜索文本 / 编辑文件 / 运行测试…）。
+- **总结卡**：打开轨迹先给一句结论 + 关键统计（命令 / 编辑文件 / 跑测试 / 补丁大小）。
+- **关键动作筛选**：一键只看「编辑文件 / 跑测试」的步骤，快速定位关键动作。
+- **Diff 视图**：补丁按 +/- 着色显示。
 - **判断**：4 个维度（task_completion_quality / safety_privacy / reporting_evaluation_integrity / execution_efficiency），可打分、加 finding、写备注。
 - **对比**：点「Compare AI Review」，并排看我的判断 vs AI 的判断，重合 step 高亮。
 - **导出**：判断导出为 JSON（并自动存 localStorage）。
