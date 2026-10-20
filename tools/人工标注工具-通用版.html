@@ -221,20 +221,53 @@ async function translateMsg(idx){
   var key = curId + ':' + idx; var m = trajs[curId].messages[idx]; var out = byId('trans-'+idx);
   if(transCache[key]){ out.textContent = transCache[key]; return; }
   var text = (m.text||'').trim(); if(!text){ out.textContent='(无内容)'; return; }
-  out.textContent = '翻译中…';
-  try { var t = await mt(text); if(t){ transCache[key]=t; out.textContent=t; } else out.textContent='翻译失败'; } catch(e){ out.textContent='翻译失败（可能无网络或接口受限）：'+e.message; }
+  var n = Math.ceil(text.length/450);
+  out.textContent = '翻译中…' + (n>1 ? '（共 '+n+' 段，逐段翻译）' : '');
+  try { var t = await mtLong(text); if(t){ transCache[key]=t; out.textContent=t; } else out.textContent='翻译失败'; } catch(e){ out.textContent='翻译失败（可能无网络或接口受限）：'+e.message; }
 }
 async function translateProblem(){
   var t = trajs[curId]; var out = byId('probZh'); var key='prob:'+curId;
   if(transCache[key]){ out.textContent=transCache[key]; out.style.display='block'; return; }
   var text=(t.problem||'').trim(); if(!text){ out.textContent='(无内容)'; out.style.display='block'; return; }
   out.textContent='翻译中…（较长，分块翻译，请稍候）'; out.style.display='block';
-  try { var chunks=[]; for(var i=0;i<text.length;i+=400) chunks.push(text.slice(i,i+400)); var parts=[]; for(var j=0;j<chunks.length;j++) parts.push(await mt(chunks[j]) || chunks[j]); var full=parts.join(''); transCache[key]=full; out.textContent=full; } catch(e){ out.textContent='翻译失败：'+e.message; }
+  try { var full = await mtLong(text); transCache[key]=full; out.textContent=full; } catch(e){ out.textContent='翻译失败：'+e.message; }
 }
 async function mt(text){
   var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair=en|zh-CN';
   var resp=await fetch(url); var json=await resp.json();
   return json && json.responseData && json.responseData.translatedText;
+}
+function chunkText(text, max){
+  max = max || 450;
+  var out = [], paras = String(text).split(/\n/);
+  for (var p = 0; p < paras.length; p++) {
+    var para = paras[p];
+    if (!para) continue;
+    if (para.length <= max) { out.push(para); continue; }
+    var parts = para.split(/(?<=[.!?。！？;；])\s+/);
+    var buf = '';
+    for (var i = 0; i < parts.length; i++) {
+      var seg = parts[i];
+      if ((buf + ' ' + seg).length <= max) { buf = buf ? (buf + ' ' + seg) : seg; }
+      else {
+        if (buf) { out.push(buf); buf = ''; }
+        while (seg.length > max) { out.push(seg.slice(0, max)); seg = seg.slice(max); }
+        buf = seg;
+      }
+    }
+    if (buf) out.push(buf);
+  }
+  return out;
+}
+async function mtLong(text){
+  var chunks = chunkText(text, 450);
+  var parts = [];
+  for (var i = 0; i < chunks.length; i++) {
+    var t = await mt(chunks[i]);
+    parts.push(t || chunks[i]);
+    if (i < chunks.length - 1) await new Promise(function(r){ setTimeout(r, 120); });
+  }
+  return parts.join('\n');
 }
 function revealAI(){
   if(curId===null || !trajs[curId]){ byId('compareBody').innerHTML='<p class="empty">请先加载轨迹 JSON。</p>'; byId('comparePanel').style.display='block'; return; }
