@@ -221,21 +221,68 @@ async function translateMsg(idx){
   var key = curId + ':' + idx; var m = trajs[curId].messages[idx]; var out = byId('trans-'+idx);
   if(transCache[key]){ out.textContent = transCache[key]; return; }
   var text = (m.text||'').trim(); if(!text){ out.textContent='(无内容)'; return; }
-  var n = Math.ceil(text.length/450);
-  out.textContent = '翻译中…' + (n>1 ? '（共 '+n+' 段，逐段翻译）' : '');
-  try { var t = await mtLong(text); if(t){ transCache[key]=t; out.textContent=t; } else out.textContent='翻译失败'; } catch(e){ out.textContent='翻译失败（可能无网络或接口受限）：'+e.message; }
+  try {
+    if(text.length <= 2000){
+      var n = Math.ceil(text.length/450);
+      out.textContent = '翻译中…' + (n>1 ? '（共 '+n+' 段）' : '');
+      var t = await mtLong(text);
+      if(t){ transCache[key]=t; out.textContent=t; } else out.textContent='翻译失败';
+    } else {
+      out.textContent = '原文较长（'+text.length+' 字），提取关键句…';
+      var sum = summarizeText(text, 700);
+      var st = await mtLong(sum);
+      var res = '【摘要】原文 '+text.length+' 字，以下为关键句摘要：' + String.fromCharCode(10) + (st || sum);
+      transCache[key] = res; out.textContent = res;
+    }
+  } catch(e){ out.textContent='翻译失败（可能无网络或接口受限）：'+e.message; }
 }
 async function translateProblem(){
   var t = trajs[curId]; var out = byId('probZh'); var key='prob:'+curId;
   if(transCache[key]){ out.textContent=transCache[key]; out.style.display='block'; return; }
   var text=(t.problem||'').trim(); if(!text){ out.textContent='(无内容)'; out.style.display='block'; return; }
-  out.textContent='翻译中…（较长，分块翻译，请稍候）'; out.style.display='block';
-  try { var full = await mtLong(text); transCache[key]=full; out.textContent=full; } catch(e){ out.textContent='翻译失败：'+e.message; }
+  out.style.display='block';
+  try {
+    if(text.length <= 2000){
+      out.textContent='翻译中…（分块翻译，请稍候）';
+      var full = await mtLong(text);
+      transCache[key]=full; out.textContent=full;
+    } else {
+      out.textContent='原文较长（'+text.length+' 字），提取关键句…';
+      var sum = summarizeText(text, 700);
+      var st = await mtLong(sum);
+      var res = '【摘要】原文 '+text.length+' 字，以下为关键句摘要：' + String.fromCharCode(10) + (st || sum);
+      transCache[key]=res; out.textContent=res;
+    }
+  } catch(e){ out.textContent='翻译失败：'+e.message; }
 }
 async function mt(text){
   var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair=en|zh-CN';
   var resp=await fetch(url); var json=await resp.json();
   return json && json.responseData && json.responseData.translatedText;
+}
+function summarizeText(text, max){
+  max = max || 700;
+  var t = String(text).replace(/\r/g,'');
+  var sents = t.split(/(?<=[.!?。！？])\s+|\n+/).map(function(s){ return s.trim(); }).filter(Boolean);
+  if(!sents.length) return t.slice(0, max);
+  var KEY = /(error|fail|bug|fix|implement|add|remove|update|test|result|because|therefore|however|conclusion|summary|note|important|need|should|must|problem|issue|change|solution|done|created|modified|final)/i;
+  var scored = sents.map(function(s, i){
+    var score = 0;
+    if(i===0) score += 3;
+    if(i===sents.length-1) score += 2;
+    if(KEY.test(s)) score += 2;
+    if(s.length>40 && s.length<300) score += 1;
+    if(i<3) score += 1;
+    return { s:s, i:i, score:score };
+  });
+  scored.sort(function(a,b){ return b.score - a.score; });
+  var picked = [], len = 0;
+  for(var k=0;k<scored.length && len<max;k++){
+    if(len + scored[k].s.length + 1 > max) continue;
+    picked.push(scored[k]); len += scored[k].s.length + 1;
+  }
+  picked.sort(function(a,b){ return a.i - b.i; });
+  return picked.map(function(x){ return x.s; }).join(' ');
 }
 function chunkText(text, max){
   max = max || 450;
