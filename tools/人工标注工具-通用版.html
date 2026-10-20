@@ -356,7 +356,22 @@ function revealAI(){
 }
 function exportJSON(){
   var reviewer = byId('reviewerInput').value.trim() || 'annotator';
-  var out = { exportedAt:new Date().toISOString(), reviewer:reviewer, judgments:state };
+  var judgments = {};
+  Object.keys(state).forEach(function(k){
+    var s = state[k]; var clean = {}; var has = false;
+    DIMS.forEach(function(d){
+      var x = s[d.key] || {};
+      var findings = (x.findings || []).filter(function(f){ return String(f.reason || '').trim() || String(f.step || '').trim(); });
+      clean[d.key] = { rating: x.rating || null, findings: findings, notes: String(x.notes || '').trim() };
+      if (clean[d.key].rating || findings.length || clean[d.key].notes) has = true;
+    });
+    if (!has) return;
+    var t = trajs[Number(k)];
+    var key = t ? t.id : ('traj_' + k);
+    clean.label = t ? t.label : ('#' + k);
+    judgments[key] = clean;
+  });
+  var out = { exportedAt:new Date().toISOString(), reviewer:reviewer, judgments:judgments };
   var blob = new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
   var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=reviewer+'_标注判断.json'; a.click();
 }
