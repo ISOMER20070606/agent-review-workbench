@@ -148,12 +148,16 @@ function processTexts(items){
   if(trajs.length && curId===null) selectTraj(0);
 }
 async function restoreCache(){
-  var saved = null; try{ saved = localStorage.getItem('anno-curId'); }catch(e){}
+  var saved = null, savedId = null;
+  try{ saved = localStorage.getItem('anno-curId'); savedId = localStorage.getItem('anno-curTraj'); }catch(e){}
   var items = await cacheLoad();
   if (!items.length) return;
   processTexts(items);
   byId('dropTip').style.display = 'none';
-  if (saved !== null && trajs[Number(saved)]) selectTraj(Number(saved));
+  var idx = -1;
+  if (savedId) { for (var i = 0; i < trajs.length; i++) { if (trajs[i].id === savedId) { idx = i; break; } } }
+  if (idx < 0 && saved !== null && trajs[Number(saved)]) idx = Number(saved);
+  if (idx >= 0) selectTraj(idx);
 }
 function addTraj(obj, filename){
   var id = obj.instance_id || filename;
@@ -185,7 +189,7 @@ function renderSelector(){
   trajs.forEach(function(t,i){ var o=document.createElement('option'); o.value=String(i); o.textContent=t.label; sel.appendChild(o); });
   if(trajs.length) sel.value = String(curId===null?0:curId);
 }
-function selectTraj(idx){ curId=idx; byId('trajSel').value=String(idx); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); }catch(e){} }
+function selectTraj(idx){ curId=idx; byId('trajSel').value=String(idx); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); if(trajs[idx]) localStorage.setItem('anno-curTraj', trajs[idx].id); }catch(e){} }
 function filterBarHtml(){
   var fs=[['all','全部'],['key','关键动作'],['assistant','助手思考'],['cmd','命令/结果']];
   return '<div class="filter-bar">'+fs.map(function(f){ return '<button class="filter-btn'+(msgFilter===f[0]?' on':'')+'" data-act="filter" data-val="'+f[0]+'">'+f[1]+'</button>'; }).join('')+'</div>';
