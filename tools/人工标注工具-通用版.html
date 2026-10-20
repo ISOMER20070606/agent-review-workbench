@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>轨迹人工标注工具（通用版）v1.02</title><style>:root{--bg:#f5f6f8;--card:#fff;--line:#e3e6ea;--text:#1f2329;--muted:#6b7280;--accent:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--info:#0891b2;}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:14px}header{position:sticky;top:0;z-index:50;background:#0f172a;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}header h1{font-size:16px;margin:0;font-weight:600}header select{font-size:14px;padding:6px 8px;border-radius:6px;border:none;min-width:300px;max-width:420px}header input[type=text]{font-size:13px;padding:6px 8px;border-radius:6px;border:none;width:150px}.btn{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px}.btn:hover{background:#f0f2f5}.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-primary:hover{background:#1d4ed8}.btn-ghost{background:transparent;color:#cbd5e1;border-color:#334155}.tipbar{background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:8px 16px;font-size:13px}main{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;align-items:start}.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}.panel-head{padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600;display:flex;justify-content:space-between;align-items:center;background:#fafbfc}.panel-body{padding:12px;max-height:calc(100vh - 150px);overflow-y:auto}.meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:#eef2ff;color:#3730a3;border:1px solid #dbe2ff}.badge.red{background:#fee2e2;color:#991b1b;border-color:#fecaca}.badge.green{background:#dcfce7;color:#166534;border-color:#bbf7d0}.badge.amber{background:#fef3c7;color:#92400e;border-color:#fde68a}details{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:#fff}summary{cursor:pointer;padding:6px 10px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;display:flex;gap:8px;align-items:baseline;user-select:none}summary:hover{background:#f8fafc}.step{color:var(--muted);min-width:54px;flex:none}.hint{background:#fff7ed;color:#c2410c;padding:1px 7px;border-radius:4px;font-size:11.5px;border:1px solid #fed7aa;flex:none;white-space:nowrap}.hint.ast{background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe}.hint.res{background:#ecfeff;color:#0e7490;border-color:#a5f3fc}.hint.usr{background:#fdf2f8;color:#be185d;border-color:#fbcfe8}.role{font-weight:600;flex:none}.role.call{color:var(--accent)}.role.res{color:var(--info)}.role.usr{color:#7c3aed}.role.ast{color:#475569}.preview{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.full{padding:8px 10px;border-top:1px dashed var(--line);font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:400px;overflow:auto;background:#fbfcfe}.trans-chip{cursor:pointer;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:4px;padding:0 6px;font-size:11.5px;flex:none;margin-left:2px}.trans-chip:hover{background:#e0e7ff}.trans-area{padding:0 10px 8px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.trans-out{font-size:12.5px;white-space:pre-wrap;word-break:break-word;padding:6px 8px;background:#f0fdf4;border-radius:6px;border-left:3px solid var(--ok);margin-top:4px;max-width:100%}.trans-out:empty{display:none}.prob-h{display:flex;align-items:center;gap:8px;margin:4px 0}.dim{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}.dim-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.dim-head b{font-size:14px}.rating-group{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.rating-btn{border:1px solid var(--line);background:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px}.rating-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}.rating-btn.on.ok{background:var(--ok)}.rating-btn.on.warn{background:var(--warn)}.rating-btn.on.bad{background:var(--bad)}.rating-btn.on.info{background:var(--info)}.finding{border:1px dashed #d8dde4;border-radius:8px;padding:8px;margin:6px 0;background:#fafbfc}.finding-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}.finding input[type=number]{width:70px;padding:4px 6px;border:1px solid var(--line);border-radius:6px}.finding textarea{width:100%;min-height:44px;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical}.finding select{padding:4px 6px;border:1px solid var(--line);border-radius:6px}.ai-find{border-left:3px solid #cbd5e1;padding:8px 10px;margin:6px 0;background:#fff;border-radius:6px}.ai-find.match{border-left-color:var(--ok);background:#f0fdf4}.ai-find .r{font-size:12px;color:var(--muted);margin-top:4px}.cmp{padding:10px 12px}.muted{color:var(--muted)}.empty{color:var(--muted);font-style:italic;padding:8px 0}#comparePanel{display:none;margin:0 12px 16px}.notes{width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:13px;resize:vertical;min-height:40px}.drop{border:2px dashed #cbd5e1;border-radius:10px;padding:24px;text-align:center;color:var(--muted)}.summary{margin:10px 0;padding:12px;border-radius:10px;background:#f8fafc;border:1px solid var(--line)}.summary .concl{font-size:15px;font-weight:600;margin-bottom:6px}.summary .stats{font-size:13px;color:#374151;display:flex;flex-wrap:wrap;gap:14px}.summary .stats b{color:#111827}.filter-bar{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}.filter-btn{border:1px solid var(--line);background:#fff;padding:4px 10px;border-radius:14px;font-size:12.5px;cursor:pointer}.filter-btn.on{background:#2563eb;color:#fff;border-color:#2563eb}.diff{padding:0!important}.dl{white-space:pre-wrap;word-break:break-word;padding:0 6px}.da{background:#dcfce7}.dr{background:#fee2e2}.dh{background:#e0e7ff;color:#3730a3}</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.02</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>轨迹人工标注工具（通用版）v1.03</title><style>:root{--bg:#f5f6f8;--card:#fff;--line:#e3e6ea;--text:#1f2329;--muted:#6b7280;--accent:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;--info:#0891b2;}*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);font-size:14px}header{position:sticky;top:0;z-index:50;background:#0f172a;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}header h1{font-size:16px;margin:0;font-weight:600}header select{font-size:14px;padding:6px 8px;border-radius:6px;border:none;min-width:300px;max-width:420px}header input[type=text]{font-size:13px;padding:6px 8px;border-radius:6px;border:none;width:150px}.btn{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px}.btn:hover{background:#f0f2f5}.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}.btn-primary:hover{background:#1d4ed8}.btn-ghost{background:transparent;color:#cbd5e1;border-color:#334155}.tipbar{background:#fffbeb;border:1px solid #fde68a;color:#92400e;padding:8px 16px;font-size:13px}main{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;align-items:start}.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}.panel-head{padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600;display:flex;justify-content:space-between;align-items:center;background:#fafbfc}.panel-body{padding:12px;max-height:calc(100vh - 150px);overflow-y:auto}.meta{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;background:#eef2ff;color:#3730a3;border:1px solid #dbe2ff}.badge.red{background:#fee2e2;color:#991b1b;border-color:#fecaca}.badge.green{background:#dcfce7;color:#166534;border-color:#bbf7d0}.badge.amber{background:#fef3c7;color:#92400e;border-color:#fde68a}details{border:1px solid var(--line);border-radius:8px;margin:6px 0;background:#fff}summary{cursor:pointer;padding:6px 10px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;display:flex;gap:8px;align-items:baseline;user-select:none}summary:hover{background:#f8fafc}.step{color:var(--muted);min-width:54px;flex:none}.hint{background:#fff7ed;color:#c2410c;padding:1px 7px;border-radius:4px;font-size:11.5px;border:1px solid #fed7aa;flex:none;white-space:nowrap}.hint.ast{background:#f5f3ff;color:#6d28d9;border-color:#ddd6fe}.hint.res{background:#ecfeff;color:#0e7490;border-color:#a5f3fc}.hint.usr{background:#fdf2f8;color:#be185d;border-color:#fbcfe8}.role{font-weight:600;flex:none}.role.call{color:var(--accent)}.role.res{color:var(--info)}.role.usr{color:#7c3aed}.role.ast{color:#475569}.preview{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}.full{padding:8px 10px;border-top:1px dashed var(--line);font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:400px;overflow:auto;background:#fbfcfe}.trans-chip{cursor:pointer;background:#eef2ff;color:#3730a3;border:1px solid #c7d2fe;border-radius:4px;padding:0 6px;font-size:11.5px;flex:none;margin-left:2px}.trans-chip:hover{background:#e0e7ff}.trans-area{padding:0 10px 8px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}.trans-out{font-size:12.5px;white-space:pre-wrap;word-break:break-word;padding:6px 8px;background:#f0fdf4;border-radius:6px;border-left:3px solid var(--ok);margin-top:4px;max-width:100%}.trans-out:empty{display:none}.prob-h{display:flex;align-items:center;gap:8px;margin:4px 0}.dim{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}.dim-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.dim-head b{font-size:14px}.rating-group{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}.rating-btn{border:1px solid var(--line);background:#fff;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:13px}.rating-btn.on{background:var(--accent);color:#fff;border-color:var(--accent)}.rating-btn.on.ok{background:var(--ok)}.rating-btn.on.warn{background:var(--warn)}.rating-btn.on.bad{background:var(--bad)}.rating-btn.on.info{background:var(--info)}.finding{border:1px dashed #d8dde4;border-radius:8px;padding:8px;margin:6px 0;background:#fafbfc}.finding-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}.finding input[type=number]{width:70px;padding:4px 6px;border:1px solid var(--line);border-radius:6px}.finding textarea{width:100%;min-height:44px;padding:6px;border:1px solid var(--line);border-radius:6px;font-size:13px;font-family:inherit;resize:vertical}.finding select{padding:4px 6px;border:1px solid var(--line);border-radius:6px}.ai-find{border-left:3px solid #cbd5e1;padding:8px 10px;margin:6px 0;background:#fff;border-radius:6px}.ai-find.match{border-left-color:var(--ok);background:#f0fdf4}.ai-find .r{font-size:12px;color:var(--muted);margin-top:4px}.cmp{padding:10px 12px}.muted{color:var(--muted)}.empty{color:var(--muted);font-style:italic;padding:8px 0}#comparePanel{display:none;margin:0 12px 16px}.notes{width:100%;padding:6px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:13px;resize:vertical;min-height:40px}.drop{border:2px dashed #cbd5e1;border-radius:10px;padding:24px;text-align:center;color:var(--muted)}.summary{margin:10px 0;padding:12px;border-radius:10px;background:#f8fafc;border:1px solid var(--line)}.summary .concl{font-size:15px;font-weight:600;margin-bottom:6px}.summary .stats{font-size:13px;color:#374151;display:flex;flex-wrap:wrap;gap:14px}.summary .stats b{color:#111827}.filter-bar{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}.filter-btn{border:1px solid var(--line);background:#fff;padding:4px 10px;border-radius:14px;font-size:12.5px;cursor:pointer}.filter-btn.on{background:#2563eb;color:#fff;border-color:#2563eb}.diff{padding:0!important}.dl{white-space:pre-wrap;word-break:break-word;padding:0 6px}.da{background:#dcfce7}.dr{background:#fee2e2}.dh{background:#e0e7ff;color:#3730a3}</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.03</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
   {key:'safety_privacy', label:'safety_privacy', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
@@ -11,6 +11,48 @@ function getSt(id){ if(!state[id]){ state[id]={}; DIMS.forEach(function(d){ stat
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function trunc(s,n){ s=String(s==null?'':s); return s.length>n? s.slice(0,n)+'…' : s; }
 function byId(x){ return document.getElementById(x); }
+function curKey(){ return trajs[curId] ? trajs[curId].id : String(curId); }
+function idbOpen(){
+  return new Promise(function(res, rej){
+    var r = indexedDB.open('anno-cache', 1);
+    r.onupgradeneeded = function(){ r.result.createObjectStore('files', { keyPath: 'name' }); };
+    r.onsuccess = function(){ res(r.result); };
+    r.onerror = function(){ rej(r.error); };
+  });
+}
+async function cacheSave(items){
+  try {
+    var db = await idbOpen();
+    var tx = db.transaction('files','readwrite');
+    var st = tx.objectStore('files');
+    st.clear();
+    items.forEach(function(x, i){ st.put({ name: x.name, text: x.text, order: i }); });
+    await new Promise(function(res){ tx.oncomplete = res; tx.onerror = res; });
+    db.close();
+  } catch(e) { console.warn('缓存保存失败', e); }
+}
+async function cacheLoad(){
+  try {
+    var db = await idbOpen();
+    var tx = db.transaction('files','readonly');
+    var st = tx.objectStore('files');
+    var all = await new Promise(function(res){ var q = st.getAll(); q.onsuccess = function(){ res(q.result || []); }; q.onerror = function(){ res([]); }; });
+    db.close();
+    all.sort(function(a,b){ return (a.order||0) - (b.order||0); });
+    return all;
+  } catch(e) { return []; }
+}
+function migrateState(){
+  var numeric = [];
+  Object.keys(state).forEach(function(k){ if (/^\d+$/.test(k)) numeric.push(k); });
+  if (!numeric.length) return;
+  numeric.forEach(function(k){
+    var t = trajs[Number(k)];
+    if (t && !state[t.id]) state[t.id] = state[k];
+    delete state[k];
+  });
+  saveState();
+}
 function isEdit(a){ a=String(a||''); return /(?:^|[;&|]\s*)(?:cat|tee)\s+(?:-a\s+)?>\s*\S+|sed\s+-i|\.write\s*\(|open\([^)]*\)\.write/.test(a); }
 function isTest(a){ return /pytest|mocha|npm\s+test|npx\s+mocha|go\s+test|cargo\s+test|jest|vitest|phpunit|rspec/.test(String(a||'')); }
 function stats(t){
@@ -78,22 +120,44 @@ function resultHint(text){
 // ===== 加载 =====
 async function loadFiles(fileList){
   var files = Array.from(fileList);
-  var trajObjs = [], annObjs = [];
+  var items = [], bad = [];
   for(var i=0;i<files.length;i++){
     var f = files[i];
-    var text; try{ text = await f.text(); }catch(e){ alert('读取失败：'+f.name); continue; }
-    var obj; try{ obj = JSON.parse(text); }catch(e){ alert('不是合法 JSON：'+f.name); continue; }
-    if(obj && obj.messages && obj.problem) trajObjs.push({name:f.name, obj:obj});
-    else if(obj && (obj.task_completion_quality||obj.execution_efficiency||obj.safety_privacy||obj.reporting_evaluation_integrity)) annObjs.push({name:f.name, obj:obj});
-    else alert('未识别格式：'+f.name);
+    var text; try{ text = await f.text(); } catch(e){ bad.push(f.name+'（读取失败）'); continue; }
+    items.push({ name: f.name, text: text });
   }
-  trajObjs.forEach(function(o){ addTraj(o.obj, o.name); });
-  annObjs.forEach(function(o){ attachAnn(o.obj); });
-  renderSelector();
-  if(trajs.length && curId===null) selectTraj(0);
+  if (bad.length) alert('这些文件没读成功：' + String.fromCharCode(10) + bad.join(String.fromCharCode(10)));
+  if (!items.length) return;
+  await cacheSave(items);
+  processTexts(items);
   byId('dropTip').style.display = 'none';
 }
+function processTexts(items){
+  var trajObjs = [], annObjs = [], unknown = [];
+  items.forEach(function(it){
+    var obj; try{ obj = JSON.parse(it.text); }catch(e){ unknown.push(it.name); return; }
+    if(obj && obj.messages && obj.problem) trajObjs.push({name:it.name, obj:obj});
+    else if(obj && (obj.task_completion_quality||obj.execution_efficiency||obj.safety_privacy||obj.reporting_evaluation_integrity)) annObjs.push({name:it.name, obj:obj});
+    else unknown.push(it.name);
+  });
+  if (unknown.length) alert('这些文件格式没认出来：' + String.fromCharCode(10) + unknown.join(String.fromCharCode(10)));
+  trajObjs.forEach(function(o){ addTraj(o.obj, o.name); });
+  annObjs.forEach(function(o){ attachAnn(o.obj); });
+  migrateState();
+  renderSelector();
+  if(trajs.length && curId===null) selectTraj(0);
+}
+async function restoreCache(){
+  var saved = null; try{ saved = localStorage.getItem('anno-curId'); }catch(e){}
+  var items = await cacheLoad();
+  if (!items.length) return;
+  processTexts(items);
+  byId('dropTip').style.display = 'none';
+  if (saved !== null && trajs[Number(saved)]) selectTraj(Number(saved));
+}
 function addTraj(obj, filename){
+  var id = obj.instance_id || filename;
+  if (trajs.some(function(t){ return t.id === id; })) return;
   var callStep = {}, callCanon = {};
   var canon = 0;
   var msgs = [];
@@ -121,7 +185,7 @@ function renderSelector(){
   trajs.forEach(function(t,i){ var o=document.createElement('option'); o.value=String(i); o.textContent=t.label; sel.appendChild(o); });
   if(trajs.length) sel.value = String(curId===null?0:curId);
 }
-function selectTraj(idx){ curId=idx; byId('trajSel').value=String(idx); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; }
+function selectTraj(idx){ curId=idx; byId('trajSel').value=String(idx); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); }catch(e){} }
 function filterBarHtml(){
   var fs=[['all','全部'],['key','关键动作'],['assistant','助手思考'],['cmd','命令/结果']];
   return '<div class="filter-bar">'+fs.map(function(f){ return '<button class="filter-btn'+(msgFilter===f[0]?' on':'')+'" data-act="filter" data-val="'+f[0]+'">'+f[1]+'</button>'; }).join('')+'</div>';
@@ -185,7 +249,7 @@ function renderMessages(){
   wrap.appendChild(frag);
 }
 function renderJudgment(){
-  var st = getSt(curId);
+  var st = getSt(curKey());
   var h = '<p class="muted">先别点「Compare AI Review」。读完轨迹后按你的判断打分、补充 findings，再点右上角按钮对照。</p>';
   DIMS.forEach(function(d){
     var s = st[d.key];
@@ -218,11 +282,11 @@ document.addEventListener('click', function(ev){
 });
 document.addEventListener('change', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } });
 document.addEventListener('input', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } else if(act==='note'){ updN(el.getAttribute('data-dim'), el.value); } });
-function setRating(dim,val){ getSt(curId)[dim].rating=val; renderJudgment(); saveState(); }
-function addF(dim){ getSt(curId)[dim].findings.push({step:'',severity:'warning',reason:''}); renderJudgment(); saveState(); }
-function rmF(dim,idx){ getSt(curId)[dim].findings.splice(idx,1); renderJudgment(); saveState(); }
-function updF(dim,idx,field,val){ getSt(curId)[dim].findings[idx][field]=val; saveState(); }
-function updN(dim,val){ getSt(curId)[dim].notes=val; saveState(); }
+function setRating(dim,val){ getSt(curKey())[dim].rating=val; renderJudgment(); saveState(); }
+function addF(dim){ getSt(curKey())[dim].findings.push({step:'',severity:'warning',reason:''}); renderJudgment(); saveState(); }
+function rmF(dim,idx){ getSt(curKey())[dim].findings.splice(idx,1); renderJudgment(); saveState(); }
+function updF(dim,idx,field,val){ getSt(curKey())[dim].findings[idx][field]=val; saveState(); }
+function updN(dim,val){ getSt(curKey())[dim].notes=val; saveState(); }
 function saveState(){ try{ localStorage.setItem('anno-state', JSON.stringify(state)); }catch(e){} }
 function loadState(){ try{ var s=localStorage.getItem('anno-state'); if(s) state=JSON.parse(s); }catch(e){} }
 async function translateMsg(idx){
@@ -331,7 +395,7 @@ async function mtLong(text){
 }
 function revealAI(){
   if(curId===null || !trajs[curId]){ byId('compareBody').innerHTML='<p class="empty">请先加载轨迹 JSON。</p>'; byId('comparePanel').style.display='block'; return; }
-  var t = trajs[curId]; var st = getSt(curId);
+  var t = trajs[curId]; var st = getSt(curKey());
   var h = '<h3>🔍 AI 审核对比 —— '+esc(t.label)+'</h3>';
   if(!t.annotation){ h += '<p class="empty">未加载标注 JSON。</p>'; }
   else { DIMS.forEach(function(d){
@@ -366,7 +430,8 @@ function exportJSON(){
       if (clean[d.key].rating || findings.length || clean[d.key].notes) has = true;
     });
     if (!has) return;
-    var t = trajs[Number(k)];
+    var t = null;
+    for (var i = 0; i < trajs.length; i++) { if (trajs[i].id === k) { t = trajs[i]; break; } }
     var key = t ? t.id : ('traj_' + k);
     clean.label = t ? t.label : ('#' + k);
     judgments[key] = clean;
@@ -390,6 +455,7 @@ function init(){
   ['dragover','dragenter'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.style.borderColor='var(--accent)'; }); });
   ['dragleave','drop'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.style.borderColor=''; }); });
   dz.addEventListener('drop', function(e){ if(e.dataTransfer && e.dataTransfer.files.length){ loadFiles(e.dataTransfer.files); } });
+  restoreCache();
 }
 window.addEventListener('DOMContentLoaded', init);
 </script></body></html>
