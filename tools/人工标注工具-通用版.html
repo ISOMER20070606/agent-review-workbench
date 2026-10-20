@@ -94,17 +94,22 @@ async function loadFiles(fileList){
   byId('dropTip').style.display = 'none';
 }
 function addTraj(obj, filename){
-  var callStep = {};
-  (obj.messages||[]).forEach(function(m){ if(m.role==='assistant' && m.tool_calls) m.tool_calls.forEach(function(tc){ callStep[tc.id]=m.extra&&m.extra.step; }); });
+  var callStep = {}, callCanon = {};
+  var canon = 0;
   var msgs = [];
   (obj.messages||[]).forEach(function(m){
     var step = m.extra && m.extra.step;
-    if(m.role==='assistant' && m.tool_calls && m.tool_calls.length){
-      m.tool_calls.forEach(function(tc){ msgs.push({role:'tool_call', step:step, name:tc.function&&tc.function.name, args:(tc.function&&tc.function.arguments)||''}); });
-      if(m.content) msgs.push({role:'assistant', step:step, text:m.content});
-    } else if(m.role==='tool'){ msgs.push({role:'tool_result', step:callStep[m.tool_call_id], text: typeof m.content==='string'?m.content:JSON.stringify(m.content)}); }
-    else if(m.role==='user'){ msgs.push({role:'user', step:step, text:m.content}); }
-    else if(m.role==='assistant'){ msgs.push({role:'assistant', step:step, text:m.content||''}); }
+    if(m.role==='assistant'){
+      canon++;
+      if(m.tool_calls && m.tool_calls.length){
+        m.tool_calls.forEach(function(tc){ callStep[tc.id]=step; callCanon[tc.id]=canon; });
+        m.tool_calls.forEach(function(tc){ msgs.push({role:'tool_call', step:step, canonical:canon, name:tc.function&&tc.function.name, args:(tc.function&&tc.function.arguments)||''}); });
+        if(m.content) msgs.push({role:'assistant', step:step, canonical:canon, text:m.content});
+      } else {
+        msgs.push({role:'assistant', step:step, canonical:canon, text:m.content||''});
+      }
+    } else if(m.role==='tool'){ msgs.push({role:'tool_result', step:callStep[m.tool_call_id], canonical:callCanon[m.tool_call_id], text: typeof m.content==='string'?m.content:JSON.stringify(m.content)}); }
+    else if(m.role==='user'){ msgs.push({role:'user', step:step, canonical:null, text:m.content}); }
   });
   trajs.push({ id: obj.instance_id || filename, label: filename.replace(/\.json$/,''), bench: (obj.instance_id||'').toLowerCase().indexOf('deepswe')>=0?'deepswe':'swepro', model: obj.model||'', problem: obj.problem||'',
     evaluation: obj.evaluation ? {status:obj.evaluation.status, resolved:obj.evaluation.resolved, detail:(obj.evaluation.official_report&&obj.evaluation.official_report.grade&&obj.evaluation.official_report.grade.detail||'').slice(0,2000)} : null,
@@ -136,7 +141,7 @@ function renderTraj(){
   h += '<div class="full" id="probZh" style="display:none"></div>';
   if(t.patch) h += '<details><summary>🧩 生成的补丁 (patch) — '+t.patch.length+' 字</summary><div class="full diff">'+diffHtml(t.patch)+'</div></details>';
   if(t.evaluation && t.evaluation.detail) h += '<details><summary>📊 官方评测明细</summary><div class="full">'+esc(t.evaluation.detail)+'</div></details>';
-  h += '<div style="margin-top:10px"><b>消息流水 (messages)</b></div>';
+  h += '<div style="margin-top:10px"><b>消息流水 (messages)</b> <span class="muted">步骤号：<b>#K</b> = AI 标注用的编号（1-261）；<b>step N</b> = 原始编号（1-107）</span></div>';
   h += filterBarHtml();
   h += '<div id="msgList"></div>';
   byId('trajBody').innerHTML = h;
@@ -155,7 +160,10 @@ function renderMessages(){
   t.messages.forEach(function(m, idx){
     if(!matchFilter(m)) return;
     var det = document.createElement('details'); var sum = document.createElement('summary');
-    var stepHtml = '<span class="step">'+(m.step!=null?'[step '+m.step+']':'')+'</span>';
+    var numTxt = [];
+    if(m.canonical!=null) numTxt.push('#'+m.canonical);
+    if(m.step!=null) numTxt.push('step '+m.step);
+    var stepHtml = numTxt.length ? '<span class="step">['+numTxt.join(' · ')+']</span>' : '<span class="step"></span>';
     var hint, hintCls='', roleHtml, transChip='';
     if(m.role==='tool_call'){ hint=cmdHint(m.args); if(isEdit(m.args)) hintCls=' ast'; roleHtml='<span class="role call">🔧 '+esc(m.name)+'</span>'; }
     else if(m.role==='tool_result'){ hint=resultHint(m.text); hintCls=' res'; roleHtml='<span class="role res">↳ 结果</span>'; }
