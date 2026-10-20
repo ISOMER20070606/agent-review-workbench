@@ -437,8 +437,12 @@ function exportJSON(){
     judgments[key] = clean;
   });
   var out = { exportedAt:new Date().toISOString(), reviewer:reviewer, judgments:judgments };
+  var t = trajs[curId];
+  var num = '';
+  if (t) { var mm = String(t.label || '').match(/^(\d+)/); if (mm) num = mm[1]; }
+  var fname = (num ? num + '_' : '') + reviewer + '_人工审核.json';
   var blob = new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
-  var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=reviewer+'_标注判断.json'; a.click();
+  var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; a.click();
 }
 function init(){
   loadState();
