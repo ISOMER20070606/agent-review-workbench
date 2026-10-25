@@ -154,7 +154,7 @@ function assistantHint(text){
   return '助手思考';
 }
 function resultHint(text, cmd){
-  var t = String(text || '');
+  var t = cleanOutput(text);
   if (!t.trim()) return '空输出';
   var head = t.slice(0, 2000);
   var c = String(cmd || '');
@@ -183,6 +183,15 @@ function formatArgs(args){
     return JSON.stringify(obj, null, 2);
   }
   return s.replace(/\\r\\n/g, String.fromCharCode(10)).replace(/\\n/g, String.fromCharCode(10)).replace(/\\t/g, '  ').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+}
+function cleanOutput(text){
+  var s = String(text || '');
+  s = s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '');
+  s = s.replace(/\x1b\][^\x07]*(\x07|\x1b\\)/g, '');
+  s = s.replace(/\x1b[()][A-Z0-9]/g, '');
+  s = s.replace(/\r\n/g, String.fromCharCode(10)).replace(/\r/g, String.fromCharCode(10));
+  s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+  return s;
 }
 // ===== 加载 =====
 async function loadFiles(fileList){
@@ -307,10 +316,10 @@ function renderMessages(){
     else if(m.role==='tool_result'){ hint=resultHint(m.text, m.cmd); hintCls=' res'; roleHtml='<span class="role res">↳ 结果</span>'; }
     else if(m.role==='user'){ hint='任务/输入'; hintCls=' usr'; roleHtml='<span class="role usr">👤 用户</span>'; }
     else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'">🔗 溯源</span>'; if((m.text||'').trim()) aiChip='<span class="trans-chip ai-chip" data-act="askai" data-idx="'+idx+'">🤖 问AI</span>'; }
-    var prev = m.role==='tool_call' ? formatArgs(m.args) : m.text;
+    var prev = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : m.text);
     sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
     det.appendChild(sum);
-    var bodyText = m.role==='tool_call' ? formatArgs(m.args) : (m.text||'');
+    var bodyText = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : (m.text||''));
     var full = document.createElement('div'); full.className='full';
     if (m.role === 'assistant') full.innerHTML = linkifyText(bodyText); else full.textContent = bodyText;
     det.appendChild(full);
@@ -460,7 +469,7 @@ async function askAI(idx){
   for (var i = Math.max(0, idx - 4); i <= Math.min(t.messages.length - 1, idx + 2); i++) {
     var m = t.messages[i];
     var role = m.role === 'tool_call' ? ('工具:' + m.name) : (m.role === 'tool_result' ? '工具结果' : (m.role === 'assistant' ? '助手' : '用户'));
-    var body = m.role === 'tool_call' ? (m.args || '') : (m.text || '');
+    var body = m.role === 'tool_call' ? formatArgs(m.args) : cleanOutput(m.text);
     ctx.push('[' + (m.canonical != null ? '#' + m.canonical : '') + ' ' + role + '] ' + String(body).slice(0, 800));
   }
   openModal('🤖 问AI', '<div class="muted">正在请求 AI…</div>');
