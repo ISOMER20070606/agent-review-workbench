@@ -12,6 +12,7 @@
 .form-row label{width:80px;color:#374151;font-size:13px}
 .form-row input{flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px}
 mark.kw{background:#fde68a;padding:0 1px;border-radius:2px}
+.ai-chip{background:#ede9fe;border-color:#c4b5fd;color:#5b21b6}
 </style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
@@ -273,7 +274,7 @@ function renderMessages(){
     if(m.role==='tool_call'){ hint=cmdHint(m.args); if(isEdit(m.args)) hintCls=' ast'; roleHtml='<span class="role call">🔧 '+esc(m.name)+'</span>'; }
     else if(m.role==='tool_result'){ hint=resultHint(m.text, m.cmd); hintCls=' res'; roleHtml='<span class="role res">↳ 结果</span>'; }
     else if(m.role==='user'){ hint='任务/输入'; hintCls=' usr'; roleHtml='<span class="role usr">👤 用户</span>'; }
-    else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'">🔗 溯源</span>'; if((m.text||'').length>200) aiChip='<span class="trans-chip" data-act="askai" data-idx="'+idx+'">🤖 问AI</span>'; }
+    else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'">🔗 溯源</span>'; if((m.text||'').trim()) aiChip='<span class="trans-chip ai-chip" data-act="askai" data-idx="'+idx+'">🤖 问AI</span>'; }
     var prev = m.role==='tool_call' ? m.args : m.text;
     sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
     det.appendChild(sum);
