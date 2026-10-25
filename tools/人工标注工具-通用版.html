@@ -21,6 +21,13 @@ mark.kw{background:#fde68a;padding:0 1px;border-radius:2px}
 .dot:hover{outline:2px solid #b45309}
 .timeline-axis{display:flex;justify-content:space-between;font-size:11px;color:#9ca3af;margin-top:2px}
 .trace-bars{display:flex;flex-direction:column;gap:12px}
+.ev-group{margin:12px 0}
+.ev-kw{font-weight:700;color:#7c2d12;margin-bottom:4px}
+.ev-item{border:1px solid #e5e7eb;border-radius:6px;padding:6px 9px;margin:6px 0 6px 10px;background:#fff}
+.ev-item:hover{border-color:#f59e0b;background:#fffbeb}
+.ev-meta{font-size:12px;color:#6b7280;margin-bottom:4px}
+.ev-step{cursor:pointer;color:#1d4ed8;text-decoration:underline}
+.ev-snippet{font-family:ui-monospace,Consolas,monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:140px;overflow:auto;cursor:pointer}
 .bar-row{display:flex;align-items:center;gap:8px}
 .bar-label{width:180px;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-track{flex:1;background:#eef2f7;border-radius:6px;height:14px;overflow:hidden}
@@ -405,12 +412,34 @@ function tracePop(){ if (traceNav.length > 1) traceNav.pop(); renderTraceModal()
 function traceDrill(i, kw){ traceNav.push({ idx: Number(i), kw: kw || '' }); renderTraceModal(); }
 function messageBody(m){ return m.role === 'tool_call' ? (m.args || '') : (m.text || ''); }
 function messageLabel(m){ return m.canonical != null ? ('#' + m.canonical) : ('step ' + m.step); }
+function roleName(r){ return r === 'tool_result' ? '工具结果' : (r === 'tool_call' ? '工具调用' : (r === 'assistant' ? '助手' : '用户')); }
+function findEvidence(kw, idx){
+  var t = trajs[curId];
+  var out = [];
+  for (var i = idx - 1; i >= 0; i--) {
+    var m = t.messages[i];
+    var body = m.role === 'tool_call' ? formatArgs(m.args) : cleanOutput(m.text);
+    var pos = String(body).indexOf(kw);
+    if (pos < 0) continue;
+    var s = Math.max(0, pos - 100), e = Math.min(body.length, pos + kw.length + 100);
+    var snippet = (s > 0 ? '…' : '') + String(body).slice(s, e) + (e < body.length ? '…' : '');
+    var key = m.canonical != null ? m.canonical : m.step;
+    if (key == null) continue;
+    out.push({ i: i, key: key, label: messageLabel(m), role: m.role, snippet: snippet, kw: kw });
+    if (out.length >= 3) break;
+  }
+  return out;
+}
+function highlightSnippet(s, kw){
+  var shown = esc(s);
+  var safe = esc(kw).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try { return shown.replace(new RegExp(safe, 'g'), '<mark class="kw">' + esc(kw) + '</mark>'); }
+  catch(e){ return shown; }
+}
 function renderTraceModal(){
   var t = trajs[curId];
   var node = traceNav[traceNav.length - 1];
   var msg = t.messages[node.idx];
-  var total = t.messages.length;
-  var kws = extractKeywords(msg.text || '');
   var crumb = traceNav.map(function(n, i){
     if (i === 0) return '<b>当前 #' + (msg.canonical != null ? msg.canonical : n.idx) + '</b>';
     return ' ▸ <span class="crumb-kw">' + esc(n.kw) + '</span>';
@@ -418,344 +447,26 @@ function renderTraceModal(){
   var html = '<div class="trace-crumb">' + crumb;
   if (traceNav.length > 1) html += ' <button class="btn" data-act="tracePop">← 返回上一级</button>';
   html += '</div>';
-  html += '<div class="trace-snippet">' + esc(String(msg.text || '').slice(0, 260)) + '…</div>';
-  if (!kws.length) { html += '<div class="empty">没提取到关键词</div>'; openModal('🔗 溯源 · ' + messageLabel(msg), html); return; }
-  // 关键词统计
-  var stats = kws.map(function(k){
-    var hits = [];
-    for (var i = 0; i < total; i++) {
-      if (i === node.idx) continue;
-      var m = t.messages[i];
-      if (String(messageBody(m)).indexOf(k) < 0) continue;
-      if (m.canonical == null && m.step == null) continue;
-      hits.push(i);
-    }
-    return { k:k, hits:hits };
-  }).filter(function(x){ return x.hits.length; });
-  stats.sort(function(a,b){ return b.hits.length - a.hits.length; });
-  var maxHits = stats.length ? stats[0].hits.length : 1;
-  // 总时间轴（所有关键词命中位置）
-  var allHits = {};
-  stats.forEach(function(s){ s.hits.forEach(function(i){ allHits[i] = (allHits[i]||0) + 1; }); });
-  var dots = Object.keys(allHits).map(function(i){
-    var m = t.messages[i];
-    var key = m.canonical != null ? m.canonical : m.step;
-    var size = Math.min(14, 8 + (allHits[i] - 1) * 3);
-    return '<span class="dot" style="left:' + (i / Math.max(1, total) * 100) + '%;width:' + size + 'px;height:' + size + 'px;top:' + (5 - size / 2) + 'px;opacity:' + Math.min(1, 0.4 + allHits[i] * 0.2) + '" title="' + messageLabel(m) + '（命中 ' + allHits[i] + ' 个关键词）" data-act="jumpClose" data-key="' + key + '"></span>';
-  }).join('');
-  html += '<div class="trace-section"><b>命中分布</b> <span class="muted">左=轨迹开始，右=结束；橙点=关键词出现的位置（越大越深=命中越多），点击可跳转</span><div class="timeline">' + dots + '</div><div class="timeline-axis"><span>开始</span><span>结束</span></div></div>';
-  html += '<div class="trace-bars">';
-  stats.slice(0, 8).forEach(function(s){
-    html += '<div class="bar-group">';
-    html += '<div class="bar-row"><div class="bar-label" title="' + esc(s.k) + '">' + esc(s.k) + '</div>';
-    html += '<div class="bar-track"><div class="bar-fill" style="width:' + (s.hits.length / maxHits * 100) + '%"></div></div>';
-    html += '<div class="bar-count">' + s.hits.length + '</div></div>';
-    html += '<div class="step-chips">' + s.hits.slice(0, 8).map(function(i){
-      return '<span class="chip" data-act="traceDrill" data-idx="' + i + '" data-kw="' + esc(s.k) + '">' + messageLabel(t.messages[i]) + '</span>';
-    }).join('') + (s.hits.length > 8 ? '<span class="muted">+' + (s.hits.length - 8) + '</span>' : '') + '</div>';
+  html += '<div class="trace-snippet">' + esc(String(msg.text || '').slice(0, 300)) + '…</div>';
+  var all = extractKeywords(msg.text || '');
+  var withEv = all.filter(function(k){ return findEvidence(k, node.idx).length > 0; });
+  var kws = (withEv.length ? withEv : all).slice(0, 4);
+  if (!kws.length) { html += '<div class="empty">没提取到关键点</div>'; openModal('🔗 溯源 · ' + messageLabel(msg), html); return; }
+  html += '<div class="trace-title">关键点 → 证据（点击证据跳到那一步并高亮关键词）</div>';
+  kws.forEach(function(k){
+    var ev = findEvidence(k, node.idx);
+    html += '<div class="ev-group"><div class="ev-kw">' + esc(k) + ' <span class="muted">（' + ev.length + ' 条证据）</span></div>';
+    if (!ev.length) html += '<div class="muted" style="margin-left:10px">未找到更早的证据</div>';
+    ev.forEach(function(e){
+      html += '<div class="ev-item">';
+      html += '<div class="ev-meta"><span class="ev-step" data-act="traceDrill" data-idx="' + e.i + '" data-kw="' + esc(e.kw) + '">' + e.label + '</span> · ' + roleName(e.role) + '</div>';
+      html += '<div class="ev-snippet" data-act="jumpClose" data-key="' + e.key + '" data-kw="' + esc(e.kw) + '">' + highlightSnippet(e.snippet, e.kw) + '</div>';
+      html += '</div>';
+    });
     html += '</div>';
   });
-  html += '</div>';
   openModal('🔗 溯源 · ' + messageLabel(msg), html);
 }
 
-async function askAI(idx){
-  var base = '', key = '', model = '';
-  try { base = localStorage.getItem('ai-base') || ''; key = localStorage.getItem('ai-key') || ''; model = localStorage.getItem('ai-model') || ''; } catch(e){}
-  if (window.AI_CONFIG) { base = base || window.AI_CONFIG.base || ''; key = key || window.AI_CONFIG.key || ''; model = model || window.AI_CONFIG.model || ''; }
-  if (!base || !key) { openModal('🤖 问AI', '<div class="empty">还没配置 API。点右上角「⚙️ AI」填写接口地址和 Key。</div>'); return; }
-  var t = trajs[curId];
-  var ctx = [];
-  for (var i = Math.max(0, idx - 4); i <= Math.min(t.messages.length - 1, idx + 2); i++) {
-    var m = t.messages[i];
-    var role = m.role === 'tool_call' ? ('工具:' + m.name) : (m.role === 'tool_result' ? '工具结果' : (m.role === 'assistant' ? '助手' : '用户'));
-    var body = m.role === 'tool_call' ? formatArgs(m.args) : cleanOutput(m.text);
-    ctx.push('[' + (m.canonical != null ? '#' + m.canonical : '') + ' ' + role + '] ' + String(body).slice(0, 800));
-  }
-  openModal('🤖 问AI', '<div class="muted">正在请求 AI…</div>');
-  try {
-    var r = await fetch(base.replace(/\/+$/, '') + '/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({
-        model: model || 'deepseek-chat',
-        temperature: 0.2,
-        messages: [
-          { role: 'system', content: (function(){ try { return localStorage.getItem('ai-prompt') || TRACE_PROMPT; } catch(e){ return TRACE_PROMPT; } })() },
-          { role: 'user', content: '以下是一条 agent 轨迹的片段：\n\n' + ctx.join('\n\n') }
-        ]
-      })
-    });
-    if (!r.ok) { byId('modalBody').innerHTML = '<div class="empty">请求失败：HTTP ' + r.status + '（可能是 CORS 或 Key 无效）</div>'; return; }
-    var j = await r.json();
-    var txt = j && j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    byId('modalBody').innerHTML = '<div class="ai-out" style="display:block">' + esc(txt || '（无返回内容）') + '</div>';
-  } catch(e) { byId('modalBody').innerHTML = '<div class="empty">请求失败：' + esc(e.message) + '（可能是网络/CORS 限制）</div>'; }
-}
-
-function openAISettings(){
-  var base = '', key = '', model = '', prompt = TRACE_PROMPT;
-  try { base = localStorage.getItem('ai-base') || ''; key = localStorage.getItem('ai-key') || ''; model = localStorage.getItem('ai-model') || ''; prompt = localStorage.getItem('ai-prompt') || TRACE_PROMPT; } catch(e){}
-  if (window.AI_CONFIG) { base = base || window.AI_CONFIG.base || ''; key = key || window.AI_CONFIG.key || ''; model = model || window.AI_CONFIG.model || ''; }
-  var html = ''
-    + '<div class="form-row"><label>接口地址</label><input id="aiBase" value="' + esc(base) + '" placeholder="https://api.deepseek.com/v1"></div>'
-    + '<div class="form-row"><label>API Key</label><input id="aiKey" type="password" value="' + esc(key) + '" placeholder="sk-..."></div>'
-    + '<div class="form-row"><label>模型</label><input id="aiModel" value="' + esc(model) + '" placeholder="deepseek-chat"></div>'
-    + '<div class="form-row" style="align-items:flex-start"><label style="padding-top:6px">提示词</label><textarea id="aiPrompt" rows="4" style="flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12.5px">' + esc(prompt) + '</textarea></div>'
-    + '<div style="margin-top:12px"><button class="btn btn-primary" data-act="aiSave">保存</button></div>'
-    + '<p class="muted" style="margin-top:10px">Key 只保存在浏览器 localStorage；也可以写进同目录的 ai-config.js（该文件不会上传仓库）。</p>';
-  openModal('⚙️ AI 接口设置', html);
-}
-function saveAISettings(){
-  try {
-    localStorage.setItem('ai-base', byId('aiBase').value.trim());
-    localStorage.setItem('ai-key', byId('aiKey').value.trim());
-    localStorage.setItem('ai-model', byId('aiModel').value.trim());
-    localStorage.setItem('ai-prompt', byId('aiPrompt').value.trim());
-  } catch(e){}
-  closeModal();
-}
-
-function renderJudgment(){
-  var st = getSt(curKey());
-  var h = '<p class="muted">先别点「Compare AI Review」。读完轨迹后按你的判断打分、补充 findings，再点右上角按钮对照。</p>';
-  DIMS.forEach(function(d){
-    var s = st[d.key];
-    h += '<div class="dim"><div class="dim-head"><b>'+esc(d.label)+'</b>'+(d.zh?' <span class="muted">'+esc(d.zh)+'</span>':'')+'</div>';
-    h += '<div class="rating-group">';
-    d.ratings.forEach(function(r){ var on = s.rating===r; h += '<button class="rating-btn'+(on?' on '+d.rl[r][1]:'')+'" data-act="rating" data-dim="'+d.key+'" data-val="'+r+'">'+d.rl[r][0]+'</button>'; });
-    h += '</div><div>';
-    s.findings.forEach(function(f,idx){
-      h += '<div class="finding"><div class="finding-row">step ';
-      h += '<input type="number" value="'+esc(f.step)+'" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="step"> ';
-      h += '<select data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="severity">';
-      Object.keys(SEV).forEach(function(k){ h += '<option value="'+k+'"'+(f.severity===k?' selected':'')+'>'+SEV[k][0]+'</option>'; });
-      h += '<button class="btn" data-act="rm" data-dim="'+d.key+'" data-idx="'+idx+'">remove</button></div>';
-      h += '<textarea placeholder="问题描述 / 理由…" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="reason">'+esc(f.reason)+'</textarea></div>';
-    });
-    h += '</div><button class="btn" data-act="add" data-dim="'+d.key+'">＋ add finding</button>';
-    h += '<div style="margin-top:8px"><span class="muted">notes: </span><textarea class="notes" placeholder="（可选）重复标注、合并到哪步等…" data-act="note" data-dim="'+d.key+'">'+esc(s.notes)+'</textarea></div></div>';
-  });
-  byId('judgeBody').innerHTML = h;
-}
-document.addEventListener('click', function(ev){
-  var el = ev.target; if(!el || !el.getAttribute) return;
-  var act = el.getAttribute('data-act'); if(!act) return;
-  if(act==='rating'){ setRating(el.getAttribute('data-dim'), el.getAttribute('data-val')); }
-  else if(act==='add'){ addF(el.getAttribute('data-dim')); }
-  else if(act==='rm'){ rmF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx'))); }
-  else if(act==='filter'){ msgFilter = el.getAttribute('data-val'); renderTraj(); }
-  else if(act==='translateProb'){ translateProblem(); }
-  else if(act==='translate'){ ev.preventDefault(); var dd=el.closest?el.closest('details'):null; if(dd) dd.open=true; translateMsg(Number(el.getAttribute('data-idx'))); }
-  else if(act==='jump'){ ev.preventDefault(); jumpToStep(el.getAttribute('data-key'), el.getAttribute('data-kw')); }
-  else if(act==='askai'){ ev.preventDefault(); var da=el.closest?el.closest('details'):null; if(da) da.open=true; askAI(Number(el.getAttribute('data-idx'))); }
-  else if(act==='trace'){ ev.preventDefault(); var dt=el.closest?el.closest('details'):null; if(dt) dt.open=true; traceBack(Number(el.getAttribute('data-idx'))); }
-  else if(act==='traceDrill'){ traceDrill(el.getAttribute('data-idx'), el.getAttribute('data-kw')); }
-  else if(act==='tracePop'){ tracePop(); }
-  else if(act==='jumpClose'){ ev.preventDefault(); closeModal(); jumpToStep(el.getAttribute('data-key'), el.getAttribute('data-kw')); }
-  else if(act==='aiset'){ openAISettings(); }
-  else if(act==='modalClose'){ closeModal(); }
-  else if(act==='aiSave'){ saveAISettings(); }
-});
-document.addEventListener('change', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } });
-document.addEventListener('input', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } else if(act==='note'){ updN(el.getAttribute('data-dim'), el.value); } });
-function setRating(dim,val){ getSt(curKey())[dim].rating=val; renderJudgment(); saveState(); }
-function addF(dim){ var f={step:'',severity:'warning',reason:''}; getSt(curKey())[dim].findings.push(f); renderJudgment(); saveState(); }
-function rmF(dim,idx){ getSt(curKey())[dim].findings.splice(idx,1); renderJudgment(); saveState(); }
-function updF(dim,idx,field,val){ getSt(curKey())[dim].findings[idx][field]=val; saveState(); }
-function updN(dim,val){ getSt(curKey())[dim].notes=val; saveState(); }
-function saveState(){ try{ localStorage.setItem('anno-state', JSON.stringify(state)); }catch(e){} }
-function loadState(){ try{ var s=localStorage.getItem('anno-state'); if(s) state=JSON.parse(s); }catch(e){} }
-async function translateMsg(idx){
-  var key = curId + ':' + idx; var m = trajs[curId].messages[idx]; var out = byId('trans-'+idx);
-  if(transCache[key]){ out.textContent = transCache[key]; return; }
-  var text = (m.text||'').trim(); if(!text){ out.textContent='(无内容)'; return; }
-  try {
-    if(text.length <= 2000){
-      var n = Math.ceil(text.length/450);
-      out.textContent = '翻译中…' + (n>1 ? '（共 '+n+' 段）' : '');
-      var t = await mtLong(text);
-      if(t){ transCache[key]=t; out.textContent=t; } else out.textContent='翻译失败';
-    } else {
-      out.textContent = '原文较长（'+text.length+' 字），提取关键句…';
-      var sum = summarizeText(text, 700);
-      var st = await mtLong(sum);
-      var res = '【摘要】原文 '+text.length+' 字，以下为关键句摘要：' + String.fromCharCode(10) + (st || sum);
-      transCache[key] = res; out.textContent = res;
-    }
-  } catch(e){ out.textContent='翻译失败（可能无网络或接口受限）：'+e.message; }
-}
-async function translateProblem(){
-  var t = trajs[curId]; var out = byId('probZh'); var key='prob:'+curId;
-  if(transCache[key]){ out.textContent=transCache[key]; out.style.display='block'; return; }
-  var text=(t.problem||'').trim(); if(!text){ out.textContent='(无内容)'; out.style.display='block'; return; }
-  out.style.display='block';
-  try {
-    if(text.length <= 2000){
-      out.textContent='翻译中…（分块翻译，请稍候）';
-      var full = await mtLong(text);
-      transCache[key]=full; out.textContent=full;
-    } else {
-      out.textContent='原文较长（'+text.length+' 字），提取关键句…';
-      var sum = summarizeText(text, 700);
-      var st = await mtLong(sum);
-      var res = '【摘要】原文 '+text.length+' 字，以下为关键句摘要：' + String.fromCharCode(10) + (st || sum);
-      transCache[key]=res; out.textContent=res;
-    }
-  } catch(e){ out.textContent='翻译失败：'+e.message; }
-}
-async function mt(text){
-  var email = 'annotator@example.com';
-  try { email = localStorage.getItem('mt-email') || email; } catch(e){}
-  var url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(text) + '&langpair=en|zh-CN&de=' + encodeURIComponent(email);
-  var resp = await fetch(url); var json = await resp.json();
-  if (json && json.quotaFinished) throw new Error('今日翻译额度已用完，可点右上角「⚙️ 翻译」换个邮箱');
-  var t = json && json.responseData && json.responseData.translatedText;
-  if (!t || /MYMEMORY WARNING/i.test(t)) throw new Error(t || '翻译失败');
-  return t;
-}
-function summarizeText(text, max){
-  max = max || 700;
-  var t = String(text).replace(/\r/g,'');
-  var sents = t.split(/(?<=[.!?。！？])\s+|\n+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 12; });
-  if(!sents.length) return t.slice(0, max);
-  var POS = /(error|fail|bug|fix|implement|add|remove|update|because|therefore|so that|need to|should|must|plan|next|verify|test|result|conclusion|problem|issue|decide|choose|root cause|blocked|cannot|unable|instead|actually)/i;
-  var NEG = /^(let me|i'?ll|i will|now|ok|okay|great|good|alright|hmm)/i;
-  var scored = sents.map(function(s, i){
-    var score = 0;
-    if(i === 0) score += 3;
-    if(i === sents.length - 1) score += 3;
-    if(POS.test(s)) score += 2;
-    if(NEG.test(s)) score -= 1;
-    if(s.length > 40 && s.length < 300) score += 1;
-    if(/\d/.test(s)) score += 0.5;
-    return { s:s, i:i, score:score };
-  });
-  scored.sort(function(a,b){ return b.score - a.score; });
-  var picked = [], len = 0, seen = [];
-  for(var k = 0; k < scored.length && len < max; k++){
-    var s = scored[k].s;
-    var key = s.slice(0, 60).toLowerCase();
-    if(seen.indexOf(key) >= 0) continue;
-    if(len + s.length + 4 > max) continue;
-    picked.push(scored[k]); seen.push(key); len += s.length + 4;
-  }
-  picked.sort(function(a,b){ return a.i - b.i; });
-  return picked.map(function(x){ return '• ' + x.s; }).join('\n');
-}
-
-function chunkText(text, max){
-  max = max || 450;
-  var out = [], paras = String(text).split(/\n/);
-  for (var p = 0; p < paras.length; p++) {
-    var para = paras[p];
-    if (!para) continue;
-    if (para.length <= max) { out.push(para); continue; }
-    var parts = para.split(/(?<=[.!?。！？;；])\s+/);
-    var buf = '';
-    for (var i = 0; i < parts.length; i++) {
-      var seg = parts[i];
-      if ((buf + ' ' + seg).length <= max) { buf = buf ? (buf + ' ' + seg) : seg; }
-      else {
-        if (buf) { out.push(buf); buf = ''; }
-        while (seg.length > max) { out.push(seg.slice(0, max)); seg = seg.slice(max); }
-        buf = seg;
-      }
-    }
-    if (buf) out.push(buf);
-  }
-  return out;
-}
-async function mtLong(text){
-  var chunks = chunkText(text, 450);
-  var parts = [];
-  for (var i = 0; i < chunks.length; i++) {
-    var t = await mt(chunks[i]);
-    parts.push(t || chunks[i]);
-    if (i < chunks.length - 1) await new Promise(function(r){ setTimeout(r, 120); });
-  }
-  return parts.join('\n');
-}
-function revealAI(){
-  if(curId===null || !trajs[curId]){ byId('compareBody').innerHTML='<p class="empty">请先加载轨迹 JSON。</p>'; byId('comparePanel').style.display='block'; return; }
-  var t = trajs[curId]; var st = getSt(curKey());
-  var h = '<h3>🔍 AI 审核对比 —— '+esc(t.label)+'</h3>';
-  if(!t.annotation){ h += '<p class="empty">未加载标注 JSON。</p>'; }
-  else { DIMS.forEach(function(d){
-    var ai = t.annotation[d.key]; if(!ai) return;
-    var mine = st[d.key]; var dm = DIMS.filter(function(x){return x.key===d.key})[0];
-    var myTxt = mine.rating ? (dm.rl[mine.rating]? dm.rl[mine.rating][0] : mine.rating) : '未评';
-    h += '<div class="dim"><div class="dim-head"><b>'+esc(d.label)+'</b><span class="muted">AI 总评: <b>'+esc(ai.run_review&&ai.run_review.rating?ai.run_review.rating:'?')+'</b></span></div><div class="cmp">';
-    h += '<div>My rating: <b>'+esc(myTxt)+'</b> &nbsp;vs&nbsp; AI: <b>'+esc(ai.run_review&&ai.run_review.rating?ai.run_review.rating:'?')+'</b></div>';
-    if(ai.run_review&&ai.run_review.reason) h += '<div class="r muted">AI 理由：'+esc(ai.run_review.reason)+'</div>';
-    h += '<div style="margin-top:8px"><b>My findings ('+mine.findings.length+')</b></div>';
-    if(!mine.findings.length) h += '<div class="empty">（无）</div>';
-    mine.findings.forEach(function(f){ h += '<div class="ai-find">['+esc(f.step||'?')+'] <b>'+esc((SEV[f.severity]||[''])[0])+'</b> '+esc(f.reason)+'</div>'; });
-    var mySteps = mine.findings.map(function(f){return String(f.step);});
-    h += '<div style="margin-top:8px"><b>AI findings ('+(ai.findings||[]).length+')</b></div>';
-    if(!ai.findings||!ai.findings.length) h += '<div class="empty">（无）</div>';
-    (ai.findings||[]).forEach(function(f){ var match = mySteps.indexOf(String(f.step_id))>=0; h += '<div class="ai-find'+(match?' match':'')+'">'+(match?'✅ ':'')+'['+esc(f.step_id)+'] <b>'+esc(f.rating)+'</b> '+esc(f.reason)+'</div>'; });
-    if(mine.notes) h += '<div class="r">My note: '+esc(mine.notes)+'</div>';
-    h += '</div></div>';
-  }); }
-  byId('compareBody').innerHTML = h;
-  byId('comparePanel').style.display='block'; byId('compareBtn').style.display='none';
-}
-async function exportJSON(){
-  var reviewer = byId('reviewerInput').value.trim() || 'annotator';
-  var judgments = {};
-  Object.keys(state).forEach(function(k){
-    var s = state[k]; var clean = {}; var has = false;
-    DIMS.forEach(function(d){
-      var x = s[d.key] || {};
-      var findings = (x.findings || []).filter(function(f){ return String(f.reason || '').trim() || String(f.step || '').trim(); });
-      var cleanFindings = findings.map(function(f){ return { step: f.step, severity: f.severity, reason: f.reason }; });
-      clean[d.key] = { rating: x.rating || null, findings: cleanFindings, notes: String(x.notes || '').trim() };
-      if (clean[d.key].rating || findings.length || clean[d.key].notes) has = true;
-    });
-    if (!has) return;
-    var t = null;
-    for (var i = 0; i < trajs.length; i++) { if (trajs[i].id === k) { t = trajs[i]; break; } }
-    var key = t ? t.id : ('traj_' + k);
-    clean.label = t ? t.label : ('#' + k);
-    judgments[key] = clean;
-  });
-  var out = { exportedAt:new Date().toISOString(), reviewer:reviewer, judgments:judgments };
-  var t = trajs[curId];
-  var num = '';
-  if (t) { var mm = String(t.label || '').match(/^(\d+)/); if (mm) num = mm[1]; }
-  var fname = (num ? num + '_' : '') + reviewer + '_人工审核.json';
-  var blob = new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
-  if (window.showSaveFilePicker) {
-    try {
-      var handle = await window.showSaveFilePicker({ suggestedName: fname, types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }] });
-      var w = await handle.createWritable();
-      await w.write(blob);
-      await w.close();
-      return;
-    } catch(e) { if (e && e.name === 'AbortError') return; }
-  }
-  var a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; a.click();
-}
-function init(){
-  try { var s = document.createElement('script'); s.src = 'ai-config.js'; s.onerror = function(){}; document.head.appendChild(s); } catch(e){}
-  loadState();
-  var reviewer = localStorage.getItem('anno-reviewer') || '';
-  byId('reviewerInput').value = reviewer;
-  byId('reviewerInput').addEventListener('input', function(){ localStorage.setItem('anno-reviewer', this.value); });
-  byId('loadBtn').addEventListener('click', function(){ byId('fileInput').click(); });
-  byId('fileInput').addEventListener('change', function(){ loadFiles(this.files); this.value=''; });
-  byId('mtEmailBtn').addEventListener('click', function(){ var cur=''; try{ cur=localStorage.getItem('mt-email')||''; }catch(e){} var v=prompt('翻译邮箱（MyMemory 用它提高每日额度，可留空）:', cur); if(v!==null){ try{ localStorage.setItem('mt-email', v.trim()); }catch(e){} alert('已保存：'+(v.trim()||'(空)')); } });
-  byId('aiSetBtn').addEventListener('click', openAISettings);
-  byId('exportBtn').addEventListener('click', exportJSON);
-  byId('compareBtn').addEventListener('click', revealAI);
-  byId('trajSel').addEventListener('change', function(){ selectTraj(Number(this.value)); });
-  var dz = byId('dropTip');
-  ['dragover','dragenter'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.style.borderColor='var(--accent)'; }); });
-  ['dragleave','drop'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.style.borderColor=''; }); });
-  dz.addEventListener('drop', function(e){ if(e.dataTransfer && e.dataTransfer.files.length){ loadFiles(e.dataTransfer.files); } });
-  restoreCache();
-}
-window.addEventListener('DOMContentLoaded', init);
 </script><div class="modal-mask" id="modalMask" style="display:none"><div class="modal-box"><div class="modal-head"><b id="modalTitle"></b><button class="btn" data-act="modalClose">关闭</button></div><div class="modal-body" id="modalBody"></div></div></div>
 </body></html>
