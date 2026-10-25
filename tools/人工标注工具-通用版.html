@@ -168,6 +168,22 @@ function resultHint(text, cmd){
   if (srcPat.test(head)) return '源码';
   return '正常输出';
 }
+function formatArgs(args){
+  var s = String(args || '');
+  var obj = null;
+  try { obj = JSON.parse(s); } catch(e){}
+  if (obj && typeof obj === 'object') {
+    if (typeof obj.command === 'string') {
+      var out = obj.command;
+      var extra = [];
+      Object.keys(obj).forEach(function(k){ if (k !== 'command') extra.push(k + ': ' + JSON.stringify(obj[k])); });
+      if (extra.length) out += String.fromCharCode(10) + String.fromCharCode(10) + extra.join(String.fromCharCode(10));
+      return out;
+    }
+    return JSON.stringify(obj, null, 2);
+  }
+  return s.replace(/\\r\\n/g, String.fromCharCode(10)).replace(/\\n/g, String.fromCharCode(10)).replace(/\\t/g, '  ').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+}
 // ===== 加载 =====
 async function loadFiles(fileList){
   var files = Array.from(fileList);
@@ -291,10 +307,10 @@ function renderMessages(){
     else if(m.role==='tool_result'){ hint=resultHint(m.text, m.cmd); hintCls=' res'; roleHtml='<span class="role res">↳ 结果</span>'; }
     else if(m.role==='user'){ hint='任务/输入'; hintCls=' usr'; roleHtml='<span class="role usr">👤 用户</span>'; }
     else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'">🔗 溯源</span>'; if((m.text||'').trim()) aiChip='<span class="trans-chip ai-chip" data-act="askai" data-idx="'+idx+'">🤖 问AI</span>'; }
-    var prev = m.role==='tool_call' ? m.args : m.text;
+    var prev = m.role==='tool_call' ? formatArgs(m.args) : m.text;
     sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
     det.appendChild(sum);
-    var bodyText = m.role==='tool_call' ? (m.args||'') : (m.text||'');
+    var bodyText = m.role==='tool_call' ? formatArgs(m.args) : (m.text||'');
     var full = document.createElement('div'); full.className='full';
     if (m.role === 'assistant') full.innerHTML = linkifyText(bodyText); else full.textContent = bodyText;
     det.appendChild(full);
