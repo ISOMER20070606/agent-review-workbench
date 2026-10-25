@@ -80,7 +80,6 @@ function migrateState(){
       var x = state[k] && state[k][d.key]; if (!x || !x.findings) return;
       x.findings.forEach(function(f){
         if (f.severity !== 'warning' && f.severity !== 'fail') f.severity = 'warning';
-        if (d.key === 'execution_efficiency' && !f.stage) f.stage = 'thinking';
       });
     });
   });
@@ -506,11 +505,6 @@ function renderJudgment(){
       h += '<input type="number" value="'+esc(f.step)+'" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="step"> ';
       h += '<select data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="severity">';
       Object.keys(SEV).forEach(function(k){ h += '<option value="'+k+'"'+(f.severity===k?' selected':'')+'>'+SEV[k][0]+'</option>'; });
-      if (d.key === 'execution_efficiency') {
-        h += '<select data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="stage">';
-        [['thinking','思维'],['execution','执行']].forEach(function(s){ h += '<option value="'+s[0]+'"'+(f.stage===s[0]?' selected':'')+'>'+s[1]+'</option>'; });
-        h += '</select> ';
-      }
       h += '<button class="btn" data-act="rm" data-dim="'+d.key+'" data-idx="'+idx+'">remove</button></div>';
       h += '<textarea placeholder="问题描述 / 理由…" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="reason">'+esc(f.reason)+'</textarea></div>';
     });
@@ -541,7 +535,7 @@ document.addEventListener('click', function(ev){
 document.addEventListener('change', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } });
 document.addEventListener('input', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } else if(act==='note'){ updN(el.getAttribute('data-dim'), el.value); } });
 function setRating(dim,val){ getSt(curKey())[dim].rating=val; renderJudgment(); saveState(); }
-function addF(dim){ var f={step:'',severity:'warning',reason:''}; if(dim==='execution_efficiency') f.stage='thinking'; getSt(curKey())[dim].findings.push(f); renderJudgment(); saveState(); }
+function addF(dim){ var f={step:'',severity:'warning',reason:''}; getSt(curKey())[dim].findings.push(f); renderJudgment(); saveState(); }
 function rmF(dim,idx){ getSt(curKey())[dim].findings.splice(idx,1); renderJudgment(); saveState(); }
 function updF(dim,idx,field,val){ getSt(curKey())[dim].findings[idx][field]=val; saveState(); }
 function updN(dim,val){ getSt(curKey())[dim].notes=val; saveState(); }
@@ -690,7 +684,8 @@ async function exportJSON(){
     DIMS.forEach(function(d){
       var x = s[d.key] || {};
       var findings = (x.findings || []).filter(function(f){ return String(f.reason || '').trim() || String(f.step || '').trim(); });
-      clean[d.key] = { rating: x.rating || null, findings: findings, notes: String(x.notes || '').trim() };
+      var cleanFindings = findings.map(function(f){ return { step: f.step, severity: f.severity, reason: f.reason }; });
+      clean[d.key] = { rating: x.rating || null, findings: cleanFindings, notes: String(x.notes || '').trim() };
       if (clean[d.key].rating || findings.length || clean[d.key].notes) has = true;
     });
     if (!has) return;
