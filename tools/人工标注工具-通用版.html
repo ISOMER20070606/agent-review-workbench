@@ -12,6 +12,21 @@
 .form-row label{width:80px;color:#374151;font-size:13px}
 .form-row input{flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px}
 mark.kw{background:#fde68a;padding:0 1px;border-radius:2px}
+.trace-crumb{font-size:13px;color:#6b7280;margin-bottom:8px}
+.crumb-kw{color:#1d4ed8;font-weight:600}
+.trace-snippet{background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:8px;font-size:13px;line-height:1.6;margin-bottom:10px;white-space:pre-wrap}
+.trace-section{margin:6px 0 12px}
+.timeline{position:relative;height:10px;background:#eef2f7;border-radius:5px;margin:6px 0}
+.dot{position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#f59e0b}
+.trace-bars{display:flex;flex-direction:column;gap:12px}
+.bar-row{display:flex;align-items:center;gap:8px}
+.bar-label{width:180px;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;background:#eef2f7;border-radius:6px;height:14px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,#60a5fa,#2563eb)}
+.bar-count{width:30px;text-align:right;font-size:12px;color:#374151}
+.step-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 0 188px}
+.chip{display:inline-block;padding:2px 8px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:12px;cursor:pointer}
+.chip:hover{background:#dbeafe}
 .ai-chip{background:#ede9fe;border-color:#c4b5fd;color:#5b21b6}
 </style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
@@ -338,6 +353,8 @@ function openModal(title, html){
   byId('modalMask').style.display = 'flex';
 }
 function closeModal(){ byId('modalMask').style.display = 'none'; }
+document.addEventListener('click', function(ev){ if (ev.target && ev.target.id === 'modalMask') closeModal(); });
+document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape') closeModal(); });
 function extractKeywords(text){
   var t = String(text || '');
   var prio = {};
@@ -355,38 +372,63 @@ function extractKeywords(text){
   arr.sort(function(a,b){ return b.w - a.w || b.k.length - a.k.length; });
   return arr.slice(0, 6).map(function(x){ return x.k; });
 }
-function traceBack(idx){
+var traceNav = [];
+var TRACE_PROMPT = '你是代码 agent 轨迹分析助手。请用中文简洁解释：这段助手思考在说什么、它指出的问题是什么、对应轨迹中哪些步骤（用 #编号 指代）。';
+function traceBack(idx){ traceNav = [{ idx: idx, kw: '' }]; renderTraceModal(); }
+function tracePop(){ if (traceNav.length > 1) traceNav.pop(); renderTraceModal(); }
+function traceDrill(i, kw){ traceNav.push({ idx: Number(i), kw: kw || '' }); renderTraceModal(); }
+function messageBody(m){ return m.role === 'tool_call' ? (m.args || '') : (m.text || ''); }
+function messageLabel(m){ return m.canonical != null ? ('#' + m.canonical) : ('step ' + m.step); }
+function renderTraceModal(){
   var t = trajs[curId];
-  var msg = t.messages[idx];
+  var node = traceNav[traceNav.length - 1];
+  var msg = t.messages[node.idx];
+  var total = t.messages.length;
   var kws = extractKeywords(msg.text || '');
-  if (!kws.length) { openModal('🔗 溯源', '<div class="empty">没提取到可用于溯源的关键词</div>'); return; }
-  var rows = [];
-  kws.forEach(function(k){
-    var seen = {}, hits = [];
-    for (var i = 0; i < t.messages.length; i++) {
-      if (i === idx) continue;
+  var crumb = traceNav.map(function(n, i){
+    if (i === 0) return '<b>当前 #' + (msg.canonical != null ? msg.canonical : n.idx) + '</b>';
+    return ' ▸ <span class="crumb-kw">' + esc(n.kw) + '</span>';
+  }).join('');
+  var html = '<div class="trace-crumb">' + crumb;
+  if (traceNav.length > 1) html += ' <button class="btn" data-act="tracePop">← 返回上一级</button>';
+  html += '</div>';
+  html += '<div class="trace-snippet">' + esc(String(msg.text || '').slice(0, 260)) + '…</div>';
+  if (!kws.length) { html += '<div class="empty">没提取到关键词</div>'; openModal('🔗 溯源 · ' + messageLabel(msg), html); return; }
+  // 关键词统计
+  var stats = kws.map(function(k){
+    var hits = [];
+    for (var i = 0; i < total; i++) {
+      if (i === node.idx) continue;
       var m = t.messages[i];
-      var body = m.role === 'tool_call' ? (m.args || '') : (m.text || '');
-      if (String(body).indexOf(k) < 0) continue;
+      if (String(messageBody(m)).indexOf(k) < 0) continue;
       if (m.canonical == null && m.step == null) continue;
-      var label = m.canonical != null ? ('#' + m.canonical) : ('step ' + m.step);
-      var key = m.canonical != null ? m.canonical : m.step;
-      if (seen[label]) continue;
-      seen[label] = 1; hits.push({ label: label, key: key });
-      if (hits.length >= 5) break;
+      hits.push(i);
     }
-    if (hits.length) rows.push({ k:k, hits:hits });
-  });
-  if (!rows.length) { openModal('🔗 溯源', '<div class="empty">没找到更早的出现位置</div>'); return; }
-  var html = '<div class="trace-title">关键词 → 出现过的步骤（点击跳转并高亮关键词）</div>';
-  rows.slice(0, 5).forEach(function(r){
-    html += '<div class="trace-row"><b>' + esc(r.k) + '</b> → ';
-    html += r.hits.map(function(h){
-      return '<a href="javascript:void(0)" class="steplink" data-act="jump" data-key="' + h.key + '" data-kw="' + esc(r.k) + '">' + h.label + '</a>';
-    }).join('、');
+    return { k:k, hits:hits };
+  }).filter(function(x){ return x.hits.length; });
+  stats.sort(function(a,b){ return b.hits.length - a.hits.length; });
+  var maxHits = stats.length ? stats[0].hits.length : 1;
+  // 总时间轴（所有关键词命中位置）
+  var allHits = {};
+  stats.forEach(function(s){ s.hits.forEach(function(i){ allHits[i] = (allHits[i]||0) + 1; }); });
+  var dots = Object.keys(allHits).map(function(i){
+    var m = t.messages[i];
+    return '<span class="dot" style="left:' + (i / Math.max(1, total) * 100) + '%;opacity:' + Math.min(1, 0.35 + allHits[i] * 0.2) + '" title="' + messageLabel(m) + '"></span>';
+  }).join('');
+  html += '<div class="trace-section"><b>命中分布</b><div class="timeline">' + dots + '</div></div>';
+  html += '<div class="trace-bars">';
+  stats.slice(0, 8).forEach(function(s){
+    html += '<div class="bar-group">';
+    html += '<div class="bar-row"><div class="bar-label" title="' + esc(s.k) + '">' + esc(s.k) + '</div>';
+    html += '<div class="bar-track"><div class="bar-fill" style="width:' + (s.hits.length / maxHits * 100) + '%"></div></div>';
+    html += '<div class="bar-count">' + s.hits.length + '</div></div>';
+    html += '<div class="step-chips">' + s.hits.slice(0, 8).map(function(i){
+      return '<span class="chip" data-act="traceDrill" data-idx="' + i + '" data-kw="' + esc(s.k) + '">' + messageLabel(t.messages[i]) + '</span>';
+    }).join('') + (s.hits.length > 8 ? '<span class="muted">+' + (s.hits.length - 8) + '</span>' : '') + '</div>';
     html += '</div>';
   });
-  openModal('🔗 溯源 · #' + (msg.canonical != null ? msg.canonical : idx), html);
+  html += '</div>';
+  openModal('🔗 溯源 · ' + messageLabel(msg), html);
 }
 
 async function askAI(idx){
@@ -411,7 +453,7 @@ async function askAI(idx){
         model: model || 'deepseek-chat',
         temperature: 0.2,
         messages: [
-          { role: 'system', content: '你是代码 agent 轨迹分析助手。请用中文简洁解释：这段助手思考在说什么、它指出的问题是什么、对应轨迹中哪些步骤（用 #编号 指代）。' },
+          { role: 'system', content: (function(){ try { return localStorage.getItem('ai-prompt') || TRACE_PROMPT; } catch(e){ return TRACE_PROMPT; } })() },
           { role: 'user', content: '以下是一条 agent 轨迹的片段：\n\n' + ctx.join('\n\n') }
         ]
       })
@@ -424,13 +466,14 @@ async function askAI(idx){
 }
 
 function openAISettings(){
-  var base = '', key = '', model = '';
-  try { base = localStorage.getItem('ai-base') || ''; key = localStorage.getItem('ai-key') || ''; model = localStorage.getItem('ai-model') || ''; } catch(e){}
+  var base = '', key = '', model = '', prompt = TRACE_PROMPT;
+  try { base = localStorage.getItem('ai-base') || ''; key = localStorage.getItem('ai-key') || ''; model = localStorage.getItem('ai-model') || ''; prompt = localStorage.getItem('ai-prompt') || TRACE_PROMPT; } catch(e){}
   if (window.AI_CONFIG) { base = base || window.AI_CONFIG.base || ''; key = key || window.AI_CONFIG.key || ''; model = model || window.AI_CONFIG.model || ''; }
   var html = ''
     + '<div class="form-row"><label>接口地址</label><input id="aiBase" value="' + esc(base) + '" placeholder="https://api.deepseek.com/v1"></div>'
     + '<div class="form-row"><label>API Key</label><input id="aiKey" type="password" value="' + esc(key) + '" placeholder="sk-..."></div>'
     + '<div class="form-row"><label>模型</label><input id="aiModel" value="' + esc(model) + '" placeholder="deepseek-chat"></div>'
+    + '<div class="form-row" style="align-items:flex-start"><label style="padding-top:6px">提示词</label><textarea id="aiPrompt" rows="4" style="flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12.5px">' + esc(prompt) + '</textarea></div>'
     + '<div style="margin-top:12px"><button class="btn btn-primary" data-act="aiSave">保存</button></div>'
     + '<p class="muted" style="margin-top:10px">Key 只保存在浏览器 localStorage；也可以写进同目录的 ai-config.js（该文件不会上传仓库）。</p>';
   openModal('⚙️ AI 接口设置', html);
@@ -440,6 +483,7 @@ function saveAISettings(){
     localStorage.setItem('ai-base', byId('aiBase').value.trim());
     localStorage.setItem('ai-key', byId('aiKey').value.trim());
     localStorage.setItem('ai-model', byId('aiModel').value.trim());
+    localStorage.setItem('ai-prompt', byId('aiPrompt').value.trim());
   } catch(e){}
   closeModal();
 }
@@ -483,6 +527,8 @@ document.addEventListener('click', function(ev){
   else if(act==='jump'){ ev.preventDefault(); jumpToStep(el.getAttribute('data-key'), el.getAttribute('data-kw')); }
   else if(act==='askai'){ ev.preventDefault(); var da=el.closest?el.closest('details'):null; if(da) da.open=true; askAI(Number(el.getAttribute('data-idx'))); }
   else if(act==='trace'){ ev.preventDefault(); var dt=el.closest?el.closest('details'):null; if(dt) dt.open=true; traceBack(Number(el.getAttribute('data-idx'))); }
+  else if(act==='traceDrill'){ traceDrill(el.getAttribute('data-idx'), el.getAttribute('data-kw')); }
+  else if(act==='tracePop'){ tracePop(); }
   else if(act==='aiset'){ openAISettings(); }
   else if(act==='modalClose'){ closeModal(); }
   else if(act==='aiSave'){ saveAISettings(); }
