@@ -17,7 +17,9 @@ mark.kw{background:#fde68a;padding:0 1px;border-radius:2px}
 .trace-snippet{background:#f8fafc;border:1px solid #e5e7eb;border-radius:6px;padding:8px;font-size:13px;line-height:1.6;margin-bottom:10px;white-space:pre-wrap}
 .trace-section{margin:6px 0 12px}
 .timeline{position:relative;height:10px;background:#eef2f7;border-radius:5px;margin:6px 0}
-.dot{position:absolute;top:-3px;width:8px;height:8px;border-radius:50%;background:#f59e0b}
+.dot{position:absolute;border-radius:50%;background:#f59e0b;cursor:pointer;transform:translateX(-50%)}
+.dot:hover{outline:2px solid #b45309}
+.timeline-axis{display:flex;justify-content:space-between;font-size:11px;color:#9ca3af;margin-top:2px}
 .trace-bars{display:flex;flex-direction:column;gap:12px}
 .bar-row{display:flex;align-items:center;gap:8px}
 .bar-label{width:180px;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -413,9 +415,11 @@ function renderTraceModal(){
   stats.forEach(function(s){ s.hits.forEach(function(i){ allHits[i] = (allHits[i]||0) + 1; }); });
   var dots = Object.keys(allHits).map(function(i){
     var m = t.messages[i];
-    return '<span class="dot" style="left:' + (i / Math.max(1, total) * 100) + '%;opacity:' + Math.min(1, 0.35 + allHits[i] * 0.2) + '" title="' + messageLabel(m) + '"></span>';
+    var key = m.canonical != null ? m.canonical : m.step;
+    var size = Math.min(14, 8 + (allHits[i] - 1) * 3);
+    return '<span class="dot" style="left:' + (i / Math.max(1, total) * 100) + '%;width:' + size + 'px;height:' + size + 'px;top:' + (5 - size / 2) + 'px;opacity:' + Math.min(1, 0.4 + allHits[i] * 0.2) + '" title="' + messageLabel(m) + '（命中 ' + allHits[i] + ' 个关键词）" data-act="jumpClose" data-key="' + key + '"></span>';
   }).join('');
-  html += '<div class="trace-section"><b>命中分布</b><div class="timeline">' + dots + '</div></div>';
+  html += '<div class="trace-section"><b>命中分布</b> <span class="muted">左=轨迹开始，右=结束；橙点=关键词出现的位置（越大越深=命中越多），点击可跳转</span><div class="timeline">' + dots + '</div><div class="timeline-axis"><span>开始</span><span>结束</span></div></div>';
   html += '<div class="trace-bars">';
   stats.slice(0, 8).forEach(function(s){
     html += '<div class="bar-group">';
@@ -529,6 +533,7 @@ document.addEventListener('click', function(ev){
   else if(act==='trace'){ ev.preventDefault(); var dt=el.closest?el.closest('details'):null; if(dt) dt.open=true; traceBack(Number(el.getAttribute('data-idx'))); }
   else if(act==='traceDrill'){ traceDrill(el.getAttribute('data-idx'), el.getAttribute('data-kw')); }
   else if(act==='tracePop'){ tracePop(); }
+  else if(act==='jumpClose'){ ev.preventDefault(); closeModal(); jumpToStep(el.getAttribute('data-key'), el.getAttribute('data-kw')); }
   else if(act==='aiset'){ openAISettings(); }
   else if(act==='modalClose'){ closeModal(); }
   else if(act==='aiSave'){ saveAISettings(); }
