@@ -45,6 +45,15 @@
 
 ![标签与评级](docs/images/v104-labels.png)
 
+## Baselines（46 条轨迹）
+
+`baselines/` 里是 46 条轨迹的原始轨迹 + GPT-6 标注：
+
+- `<编号>_trajectory.json`：原始轨迹（messages / problem / generated_patch / evaluation）
+- `<编号>_annotation.json`：GPT-6 标注（4 维度 + findings）
+
+同一编号的两个文件一起选中加载，工具会自动按 instance_id 配对。完整索引见 [baselines/README.md](baselines/README.md)。
+
 ## 快速开始
 
 1. 双击 `tools/人工标注工具-通用版.html`。
