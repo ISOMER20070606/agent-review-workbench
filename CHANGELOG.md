@@ -2,6 +2,11 @@
 
 ## v1.04（2026-10-25）
 
+### 步骤号
+- 标注输入改为 **#K**（canonical），并加「📌 用此步」按钮自动填入
+- 新增 **🔄 转换步骤**：把旧标注的 raw step 一键转成 #K（带预览和歧义提示）
+- 支持加载「我的标注导出」JSON（`{judgments: ...}`），可导入旧标注后转换
+
 ### 标注维度
 - severity 只保留 **`warning` / `fail`**（去掉 normal / info）
 - `execution_efficiency` 改为 **`redundancy_repetition`（冗余和重复）**
