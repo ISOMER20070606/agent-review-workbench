@@ -38,7 +38,10 @@ mark.kw{background:#fde68a;padding:0 1px;border-radius:2px}
 .chip:hover{background:#dbeafe}
 .ai-chip{background:#ede9fe;border-color:#c4b5fd;color:#5b21b6}
 .pin-chip{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
-</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
+.conv-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
+.conv-table th,.conv-table td{border:1px solid #e5e7eb;padding:5px 7px;text-align:left}
+.conv-table th{background:#f3f4f6}
+</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
   {key:'safety_privacy', label:'safety_privacy', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
@@ -217,16 +220,18 @@ async function loadFiles(fileList){
   byId('dropTip').style.display = 'none';
 }
 function processTexts(items){
-  var trajObjs = [], annObjs = [], unknown = [];
+  var trajObjs = [], annObjs = [], judgeObjs = [], unknown = [];
   items.forEach(function(it){
     var obj; try{ obj = JSON.parse(it.text); }catch(e){ unknown.push(it.name); return; }
     if(obj && obj.messages && obj.problem) trajObjs.push({name:it.name, obj:obj});
     else if(obj && (obj.task_completion_quality||obj.execution_efficiency||obj.safety_privacy||obj.reporting_evaluation_integrity)) annObjs.push({name:it.name, obj:obj});
+    else if(obj && obj.judgments && typeof obj.judgments === 'object') judgeObjs.push(obj);
     else unknown.push(it.name);
   });
   if (unknown.length) alert('这些文件格式没认出来：' + String.fromCharCode(10) + unknown.join(String.fromCharCode(10)));
   trajObjs.forEach(function(o){ addTraj(o.obj, o.name); });
   annObjs.forEach(function(o){ attachAnn(o.obj); });
+  judgeObjs.forEach(function(o){ Object.keys(o.judgments).forEach(function(k){ state[k] = o.judgments[k]; }); });
   migrateState();
   renderSelector();
   if(trajs.length && curId===null) selectTraj(0);
@@ -527,6 +532,57 @@ function saveAISettings(){
   closeModal();
 }
 
+function buildStepMap(t){
+  var stepToCanon = {}, maxRaw = 0;
+  (t.messages||[]).forEach(function(m){
+    if (m.step != null && m.canonical != null) { stepToCanon[m.step] = m.canonical; if (m.step > maxRaw) maxRaw = m.step; }
+  });
+  return { stepToCanon: stepToCanon, maxRaw: maxRaw };
+}
+function aiStepSet(t){
+  var s = {};
+  if (t.annotation) DIMS.forEach(function(d){ ((t.annotation[d.key]||{}).findings||[]).forEach(function(f){ s[String(f.step_id)] = 1; }); });
+  return s;
+}
+var __convertPlans = [];
+function convertSteps(){
+  var changes = [], amb = [];
+  trajs.forEach(function(t){
+    var st = state[t.id]; if (!st) return;
+    var map = buildStepMap(t), ai = aiStepSet(t);
+    DIMS.forEach(function(d){
+      var x = st[d.key]; if (!x || !x.findings) return;
+      x.findings.forEach(function(f){
+        var v = String(f.step||'').trim(); if (!v) return;
+        var n = Number(v); if (!Number.isFinite(n)) return;
+        if (n > map.maxRaw || map.stepToCanon[n] == null) return;
+        if (ai[v]) { amb.push({ traj:t.label, dim:d.key, from:v, to:String(map.stepToCanon[n]) }); return; }
+        changes.push({ traj:t.label, dim:d.key, from:v, to:String(map.stepToCanon[n]), f:f });
+      });
+    });
+  });
+  __convertPlans = changes;
+  var html = '<p>共发现 <b>' + changes.length + '</b> 条可转换，<b>' + amb.length + '</b> 条有歧义（保留原值）。</p>';
+  if (changes.length) {
+    html += '<table class="conv-table"><tr><th>轨迹</th><th>维度</th><th>原值</th><th>转换后</th></tr>';
+    changes.forEach(function(r){ html += '<tr><td>'+esc(r.traj)+'</td><td>'+esc(r.dim)+'</td><td>'+esc(r.from)+'</td><td><b>'+esc(r.to)+'</b></td></tr>'; });
+    html += '</table>';
+    html += '<div style="margin-top:10px"><button class="btn btn-primary" data-act="applyConvert">应用转换</button></div>';
+  } else {
+    html += '<p class="muted">没有可自动转换的步骤号（可能已经都是 #K，或者没有加载标注）。</p>';
+  }
+  if (amb.length) {
+    html += '<p class="muted" style="margin-top:12px">有歧义、未转换（请人工确认）：</p><ul>';
+    amb.forEach(function(r){ html += '<li>'+esc(r.traj)+' · '+esc(r.dim)+'：'+esc(r.from)+'（若按 raw 转应为 '+esc(r.to)+'）</li>'; });
+    html += '</ul>';
+  }
+  openModal('🔄 转换步骤号（raw → #K）', html);
+}
+function applyConvert(){
+  (__convertPlans||[]).forEach(function(r){ r.f.step = r.to; });
+  saveState(); renderJudgment(); closeModal();
+  alert('已转换 ' + (__convertPlans||[]).length + ' 条，记得重新导出。');
+}
 function renderJudgment(){
   var st = getSt(curKey());
   var h = '<p class="muted">先别点「Compare AI Review」。读完轨迹后按你的判断打分、补充 findings，再点右上角按钮对照。</p><p class="muted">步骤号请填 <b>#K</b>（canonical，和 AI 标注一致），不要填原始 <code>step N</code>；左侧消息可点「📌 用此步」自动填入。</p>';
@@ -570,6 +626,7 @@ document.addEventListener('click', function(ev){
   else if(act==='aiset'){ openAISettings(); }
   else if(act==='modalClose'){ closeModal(); }
   else if(act==='aiSave'){ saveAISettings(); }
+  else if(act==='applyConvert'){ applyConvert(); }
 });
 document.addEventListener('change', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } });
 document.addEventListener('input', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } else if(act==='note'){ updN(el.getAttribute('data-dim'), el.value); } });
@@ -761,6 +818,7 @@ function init(){
   byId('fileInput').addEventListener('change', function(){ loadFiles(this.files); this.value=''; });
   byId('mtEmailBtn').addEventListener('click', function(){ var cur=''; try{ cur=localStorage.getItem('mt-email')||''; }catch(e){} var v=prompt('翻译邮箱（MyMemory 用它提高每日额度，可留空）:', cur); if(v!==null){ try{ localStorage.setItem('mt-email', v.trim()); }catch(e){} alert('已保存：'+(v.trim()||'(空)')); } });
   byId('aiSetBtn').addEventListener('click', openAISettings);
+  byId('convBtn').addEventListener('click', convertSteps);
   byId('exportBtn').addEventListener('click', exportJSON);
   byId('compareBtn').addEventListener('click', revealAI);
   byId('trajSel').addEventListener('change', function(){ selectTraj(Number(this.value)); });
