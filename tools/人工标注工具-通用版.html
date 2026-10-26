@@ -37,6 +37,7 @@ mark.kw{background:#fde68a;padding:0 1px;border-radius:2px}
 .chip{display:inline-block;padding:2px 8px;border-radius:10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;font-size:12px;cursor:pointer}
 .chip:hover{background:#dbeafe}
 .ai-chip{background:#ede9fe;border-color:#c4b5fd;color:#5b21b6}
+.pin-chip{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
 </style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
@@ -324,7 +325,8 @@ function renderMessages(){
     else if(m.role==='user'){ hint='任务/输入'; hintCls=' usr'; roleHtml='<span class="role usr">👤 用户</span>'; }
     else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'">🔗 溯源</span>'; if((m.text||'').trim()) aiChip='<span class="trans-chip ai-chip" data-act="askai" data-idx="'+idx+'">🤖 问AI</span>'; }
     var prev = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : m.text);
-    sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
+    var pinChip = (m.canonical != null) ? '<span class="trans-chip pin-chip" data-act="fillstep" data-key="'+m.canonical+'">📌 用此步</span>' : '';
+    sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + pinChip + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
     det.appendChild(sum);
     var bodyText = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : (m.text||''));
     var full = document.createElement('div'); full.className='full';
@@ -527,7 +529,7 @@ function saveAISettings(){
 
 function renderJudgment(){
   var st = getSt(curKey());
-  var h = '<p class="muted">先别点「Compare AI Review」。读完轨迹后按你的判断打分、补充 findings，再点右上角按钮对照。</p>';
+  var h = '<p class="muted">先别点「Compare AI Review」。读完轨迹后按你的判断打分、补充 findings，再点右上角按钮对照。</p><p class="muted">步骤号请填 <b>#K</b>（canonical，和 AI 标注一致），不要填原始 <code>step N</code>；左侧消息可点「📌 用此步」自动填入。</p>';
   DIMS.forEach(function(d){
     var s = st[d.key];
     h += '<div class="dim"><div class="dim-head"><b>'+esc(d.label)+'</b>'+(d.zh?' <span class="muted">'+esc(d.zh)+'</span>':'')+'</div>';
@@ -535,7 +537,7 @@ function renderJudgment(){
     d.ratings.forEach(function(r){ var on = s.rating===r; h += '<button class="rating-btn'+(on?' on '+d.rl[r][1]:'')+'" data-act="rating" data-dim="'+d.key+'" data-val="'+r+'">'+d.rl[r][0]+'</button>'; });
     h += '</div><div>';
     s.findings.forEach(function(f,idx){
-      h += '<div class="finding"><div class="finding-row">step ';
+      h += '<div class="finding"><div class="finding-row">#K ';
       h += '<input type="number" value="'+esc(f.step)+'" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="step"> ';
       h += '<select data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="severity">';
       Object.keys(SEV).forEach(function(k){ h += '<option value="'+k+'"'+(f.severity===k?' selected':'')+'>'+SEV[k][0]+'</option>'; });
@@ -547,6 +549,8 @@ function renderJudgment(){
   });
   byId('judgeBody').innerHTML = h;
 }
+var lastFindingInput = null;
+document.addEventListener('focusin', function(ev){ var el = ev.target; if (el && el.getAttribute && el.getAttribute('data-act')==='f' && el.getAttribute('data-field')==='step') lastFindingInput = el; });
 document.addEventListener('click', function(ev){
   var el = ev.target; if(!el || !el.getAttribute) return;
   var act = el.getAttribute('data-act'); if(!act) return;
@@ -562,6 +566,7 @@ document.addEventListener('click', function(ev){
   else if(act==='traceDrill'){ traceDrill(el.getAttribute('data-idx'), el.getAttribute('data-kw')); }
   else if(act==='tracePop'){ tracePop(); }
   else if(act==='jumpClose'){ ev.preventDefault(); closeModal(); jumpToStep(el.getAttribute('data-key'), el.getAttribute('data-kw')); }
+  else if(act==='fillstep'){ ev.preventDefault(); var kk=el.getAttribute('data-key'); if(lastFindingInput){ lastFindingInput.value=kk; lastFindingInput.dispatchEvent(new Event('input',{bubbles:true})); lastFindingInput.focus(); } else { try{ navigator.clipboard.writeText('#'+kk); }catch(e){} alert('没有聚焦的输入框，已复制 #'+kk+'；先点一下右侧 finding 的 #K 输入框，再点此按钮可直接填入'); } }
   else if(act==='aiset'){ openAISettings(); }
   else if(act==='modalClose'){ closeModal(); }
   else if(act==='aiSave'){ saveAISettings(); }
