@@ -41,6 +41,12 @@ mark.kw{background:#fde68a;padding:0 1px;border-radius:2px}
 .conv-table{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0}
 .conv-table th,.conv-table td{border:1px solid #e5e7eb;padding:5px 7px;text-align:left}
 .conv-table th{background:#f3f4f6}
+.verdict{padding:10px 12px;border-radius:8px;margin:8px 0;font-size:13.5px;line-height:1.6}
+.verdict.ok{background:#ecfdf5;border:1px solid #6ee7b7;color:#065f46}
+.verdict.warn{background:#fffbeb;border:1px solid #fcd34d;color:#92400e}
+.verdict.bad{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b}
+code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
+.bad{color:#b91c1c}
 </style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
@@ -439,10 +445,14 @@ function findEvidence(kw, idx){
 }
 function highlightSnippet(s, kw){
   var shown = esc(s);
-  var safe = esc(kw).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  try { return shown.replace(new RegExp(safe, 'g'), '<mark class="kw">' + esc(kw) + '</mark>'); }
+  var k = esc(kw);
+  var pre = /^[A-Za-z0-9_]/.test(kw) ? '\\b' : '';
+  var post = /[A-Za-z0-9_]$/.test(kw) ? '\\b' : '';
+  var safe = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  try { return shown.replace(new RegExp(pre + safe + post, 'g'), '<mark class="kw">' + k + '</mark>'); }
   catch(e){ return shown; }
 }
+
 function renderTraceModal(){
   var t = trajs[curId];
   var node = traceNav[traceNav.length - 1];
@@ -532,6 +542,58 @@ function saveAISettings(){
   closeModal();
 }
 
+function findingRootCause(dim, idx){
+  var t = trajs[curId]; var st = getSt(curKey());
+  var f = st[dim] && st[dim].findings[idx]; if (!f) return;
+  var target = Number(String(f.step || '').trim());
+  if (!Number.isFinite(target)) { openModal('🔍 根因追溯', '<div class="empty">这条 finding 还没填 #K，先填一个步骤号。</div>'); return; }
+  var kws = extractKeywords(f.reason || '');
+  var anchor = null;
+  for (var i = 0; i < t.messages.length; i++) { if (t.messages[i].canonical === target) { anchor = t.messages[i]; break; } }
+  if (anchor) extractKeywords(anchor.text || '').forEach(function(k){ if (kws.indexOf(k) < 0) kws.push(k); });
+  kws = kws.slice(0, 6);
+  if (!kws.length) { openModal('🔍 根因追溯', '<div class="empty">这条 finding 里没提取到关键词（试试在理由里写文件名 / 函数名 / 报错名）。</div>'); return; }
+  var chain = [];
+  for (var j = 0; j < t.messages.length; j++) {
+    var m = t.messages[j];
+    if (m.canonical == null || m.canonical > target) continue;
+    var body = m.role === 'tool_call' ? formatArgs(m.args) : cleanOutput(m.text);
+    var hits = kws.filter(function(k){ return String(body).indexOf(k) >= 0; });
+    if (!hits.length) continue;
+    var isResult = m.role === 'tool_result', isCall = m.role === 'tool_call';
+    chain.push({ canon: m.canonical, role: m.role, hits: hits, err: isResult && resultHint(String(body), m.cmd) === '报错输出', strong: isResult || isCall, body: String(body) });
+  }
+  var firstErr = null, firstStrong = null, firstAny = chain.length ? chain[0] : null;
+  for (var k = 0; k < chain.length; k++) { if (!firstErr && chain[k].err) firstErr = chain[k]; if (!firstStrong && chain[k].strong) firstStrong = chain[k]; }
+  var verdict, cls;
+  if (firstErr) {
+    if (firstErr.canon < target) { verdict = '不是最早：<b>#' + firstErr.canon + '</b> 的工具输出里就出现了同类报错。'; cls = 'bad'; }
+    else { verdict = '这一条就是最早出现同类报错的地方（<b>#' + target + '</b>）。'; cls = 'ok'; }
+  } else if (firstStrong) {
+    if (firstStrong.canon < target) { verdict = '更早在 <b>#' + firstStrong.canon + '</b> 的工具输出/调用里就出现了相同关键词（没报错），可能是"埋雷"的第一步。'; cls = 'warn'; }
+    else { verdict = '没找到更早的工具输出证据，<b>#' + target + '</b> 可能是最早。'; cls = 'ok'; }
+  } else if (firstAny) {
+    verdict = '更早只有助手在思考里提到过（<b>#' + firstAny.canon + '</b>），没有实际工具输出或报错；<b>#' + target + '</b> 可能是最早真正出问题的地方。'; cls = 'warn';
+  } else {
+    verdict = '没找到更早的同类证据，<b>#' + target + '</b> 可能就是最早。'; cls = 'ok';
+  }
+  var html = '<div class="trace-snippet">#' + target + ' · ' + esc(String(f.reason || '').slice(0, 200)) + '</div>';
+  html += '<div class="verdict ' + cls + '">' + verdict + '</div>';
+  html += '<div class="trace-title">关键词：' + kws.map(function(k){ return '<code>' + esc(k) + '</code>'; }).join(' ') + '</div>';
+  if (chain.length) {
+    html += '<div class="trace-title">证据链（从早到晚，共 ' + chain.length + ' 处；优先看"工具输出"）</div>';
+    chain.slice(0, 12).forEach(function(x){
+      var pos = String(x.body).indexOf(x.hits[0]);
+      var s = Math.max(0, pos - 80), e2 = Math.min(x.body.length, pos + 120);
+      var snippet = (s > 0 ? '…' : '') + x.body.slice(s, e2) + (e2 < x.body.length ? '…' : '');
+      var tag = x.role === 'tool_result' ? '工具输出' : (x.role === 'tool_call' ? '工具调用' : '助手思考');
+      html += '<div class="ev-item"><div class="ev-meta">#' + x.canon + ' · ' + tag + (x.err ? ' · <b class="bad">报错</b>' : '') + (x.canon === target ? ' · <b>当前标注</b>' : '') + ' · 命中 ' + x.hits.length + ' 个词</div>';
+      html += '<div class="ev-snippet" data-act="jumpClose" data-key="' + x.canon + '" data-kw="' + esc(x.hits[0]) + '">' + highlightSnippet(snippet, x.hits[0]) + '</div></div>';
+    });
+  }
+  openModal('🔍 根因追溯 · #' + target, html);
+}
+
 function buildStepMap(t){
   var stepToCanon = {}, maxRaw = 0;
   (t.messages||[]).forEach(function(m){
@@ -597,6 +659,7 @@ function renderJudgment(){
       h += '<input type="number" value="'+esc(f.step)+'" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="step"> ';
       h += '<select data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="severity">';
       Object.keys(SEV).forEach(function(k){ h += '<option value="'+k+'"'+(f.severity===k?' selected':'')+'>'+SEV[k][0]+'</option>'; });
+      h += '<button class="btn" data-act="rootcause" data-dim="'+d.key+'" data-idx="'+idx+'">🔍 根因</button> ';
       h += '<button class="btn" data-act="rm" data-dim="'+d.key+'" data-idx="'+idx+'">remove</button></div>';
       h += '<textarea placeholder="问题描述 / 理由…" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="reason">'+esc(f.reason)+'</textarea></div>';
     });
@@ -627,6 +690,7 @@ document.addEventListener('click', function(ev){
   else if(act==='modalClose'){ closeModal(); }
   else if(act==='aiSave'){ saveAISettings(); }
   else if(act==='applyConvert'){ applyConvert(); }
+  else if(act==='rootcause'){ ev.preventDefault(); findingRootCause(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx'))); }
 });
 document.addEventListener('change', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } });
 document.addEventListener('input', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } else if(act==='note'){ updN(el.getAttribute('data-dim'), el.value); } });
