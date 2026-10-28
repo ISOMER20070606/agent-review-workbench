@@ -334,9 +334,9 @@ function renderMessages(){
     if(m.role==='tool_call'){ hint=cmdHint(m.args); if(isEdit(m.args)) hintCls=' ast'; roleHtml='<span class="role call">🔧 '+esc(m.name)+'</span>'; }
     else if(m.role==='tool_result'){ hint=resultHint(m.text, m.cmd); hintCls=' res'; roleHtml='<span class="role res">↳ 结果</span>'; }
     else if(m.role==='user'){ hint='任务/输入'; hintCls=' usr'; roleHtml='<span class="role usr">👤 用户</span>'; }
-    else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'">🔗 溯源</span>'; if((m.text||'').trim()) aiChip='<span class="trans-chip ai-chip" data-act="askai" data-idx="'+idx+'">🤖 问AI</span>'; }
+    else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'" title="溯源：这条消息的关键点从哪来">🔗</span>'; if((m.text||'').trim()) aiChip='<span class="trans-chip ai-chip" data-act="askai" data-idx="'+idx+'" title="问 AI">🤖</span>'; }
     var prev = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : m.text);
-    var pinChip = (m.canonical != null) ? '<span class="trans-chip pin-chip" data-act="fillstep" data-key="'+m.canonical+'">📌 用此步</span>' : '';
+    var pinChip = (m.canonical != null) ? '<span class="trans-chip pin-chip" data-act="fillstep" data-key="'+m.canonical+'" title="把这条的 #K 填进右侧 finding">📌</span>' : '';
     sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + pinChip + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
     det.appendChild(sum);
     var bodyText = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : (m.text||''));
@@ -546,52 +546,62 @@ function findingRootCause(dim, idx){
   var t = trajs[curId]; var st = getSt(curKey());
   var f = st[dim] && st[dim].findings[idx]; if (!f) return;
   var target = Number(String(f.step || '').trim());
-  if (!Number.isFinite(target)) { openModal('🔍 根因追溯', '<div class="empty">这条 finding 还没填 #K，先填一个步骤号。</div>'); return; }
-  var kws = extractKeywords(f.reason || '');
+  if (!Number.isFinite(target)) { openModal('🔍 共同出错点', '<div class="empty">这条 finding 还没填 #K，先填一个步骤号。</div>'); return; }
   var anchor = null;
   for (var i = 0; i < t.messages.length; i++) { if (t.messages[i].canonical === target) { anchor = t.messages[i]; break; } }
-  if (anchor) extractKeywords(anchor.text || '').forEach(function(k){ if (kws.indexOf(k) < 0) kws.push(k); });
-  kws = kws.slice(0, 6);
-  if (!kws.length) { openModal('🔍 根因追溯', '<div class="empty">这条 finding 里没提取到关键词（试试在理由里写文件名 / 函数名 / 报错名）。</div>'); return; }
-  var chain = [];
+  var text = String(f.reason || '') + ' ' + (anchor ? String(anchor.text || '') : '');
+  var errs = text.match(/\b[A-Z][A-Za-z0-9_]*(?:Error|Exception)\b/g) || [];
+  var files = text.match(/[\w./-]+\.(?:py|js|ts|tsx|jsx|go|json|tpl|md|yml|yaml|rs|java|cpp|c|h)\b/g) || [];
+  errs = errs.filter(function(v, i, a){ return a.indexOf(v) === i; });
+  files = files.filter(function(v, i, a){ return a.indexOf(v) === i; });
+  var failures = [], edits = [];
   for (var j = 0; j < t.messages.length; j++) {
     var m = t.messages[j];
     if (m.canonical == null || m.canonical > target) continue;
     var body = m.role === 'tool_call' ? formatArgs(m.args) : cleanOutput(m.text);
-    var hits = kws.filter(function(k){ return String(body).indexOf(k) >= 0; });
-    if (!hits.length) continue;
-    var isResult = m.role === 'tool_result', isCall = m.role === 'tool_call';
-    chain.push({ canon: m.canonical, role: m.role, hits: hits, err: isResult && resultHint(String(body), m.cmd) === '报错输出', strong: isResult || isCall, body: String(body) });
+    if (m.role === 'tool_result') {
+      var isErr = resultHint(String(body), m.cmd) === '报错输出';
+      var hitErr = errs.filter(function(e){ return String(body).indexOf(e) >= 0; });
+      if (isErr && hitErr.length) failures.push({ canon: m.canonical, role: m.role, err: isErr, body: String(body), hit: hitErr.join(', ') });
+    } else if (m.role === 'tool_call' && isEdit(m.args) && files.length) {
+      var raw = String(m.args);
+      var hitFile = files.filter(function(fp){ var base = fp.split('/').pop(); return raw.indexOf(fp) >= 0 || raw.indexOf(base) >= 0; });
+      if (hitFile.length) edits.push({ canon: m.canonical, role: m.role, body: raw, hit: hitFile.join(', ') });
+    }
   }
-  var firstErr = null, firstStrong = null, firstAny = chain.length ? chain[0] : null;
-  for (var k = 0; k < chain.length; k++) { if (!firstErr && chain[k].err) firstErr = chain[k]; if (!firstStrong && chain[k].strong) firstStrong = chain[k]; }
+  var firstFail = failures.length ? failures[0] : null;
+  var firstEdit = edits.length ? edits[0] : null;
   var verdict, cls;
-  if (firstErr) {
-    if (firstErr.canon < target) { verdict = '不是最早：<b>#' + firstErr.canon + '</b> 的工具输出里就出现了同类报错。'; cls = 'bad'; }
-    else { verdict = '这一条就是最早出现同类报错的地方（<b>#' + target + '</b>）。'; cls = 'ok'; }
-  } else if (firstStrong) {
-    if (firstStrong.canon < target) { verdict = '更早在 <b>#' + firstStrong.canon + '</b> 的工具输出/调用里就出现了相同关键词（没报错），可能是"埋雷"的第一步。'; cls = 'warn'; }
-    else { verdict = '没找到更早的工具输出证据，<b>#' + target + '</b> 可能是最早。'; cls = 'ok'; }
-  } else if (firstAny) {
-    verdict = '更早只有助手在思考里提到过（<b>#' + firstAny.canon + '</b>），没有实际工具输出或报错；<b>#' + target + '</b> 可能是最早真正出问题的地方。'; cls = 'warn';
+  if (firstFail) {
+    if (firstFail.canon < target) { verdict = '不是最早：最早的同类报错在 <b>#' + firstFail.canon + '</b>（' + esc(firstFail.hit) + '）。'; cls = 'bad'; }
+    else { verdict = '这一条（<b>#' + target + '</b>）就是最早报出同类错误的地方。'; cls = 'ok'; }
+  } else if (firstEdit) {
+    if (firstEdit.canon < target) { verdict = '没找到更早的同类报错；但 <b>#' + firstEdit.canon + '</b> 就改过涉及的文件（' + esc(firstEdit.hit) + '），可能是引入点。'; cls = 'warn'; }
+    else { verdict = '没找到更早的同类报错或相关修改，<b>#' + target + '</b> 可能就是最早。'; cls = 'ok'; }
   } else {
-    verdict = '没找到更早的同类证据，<b>#' + target + '</b> 可能就是最早。'; cls = 'ok';
+    verdict = '没找到更早的同类报错、也没找到相关文件的修改记录；<b>#' + target + '</b> 可能就是最早。';
+    cls = 'ok';
   }
   var html = '<div class="trace-snippet">#' + target + ' · ' + esc(String(f.reason || '').slice(0, 200)) + '</div>';
   html += '<div class="verdict ' + cls + '">' + verdict + '</div>';
-  html += '<div class="trace-title">关键词：' + kws.map(function(k){ return '<code>' + esc(k) + '</code>'; }).join(' ') + '</div>';
+  html += '<div class="trace-title">失败签名：' + (errs.length ? errs.map(function(e){ return '<code>' + esc(e) + '</code>'; }).join(' ') : '<span class="muted">（理由里没写报错类型）</span>') + '</div>';
+  html += '<div class="trace-title">涉及文件：' + (files.length ? files.map(function(x){ return '<code>' + esc(x) + '</code>'; }).join(' ') : '<span class="muted">（没写文件名）</span>') + '</div>';
+  var chain = [];
+  failures.forEach(function(x){ chain.push({ canon: x.canon, kind: 'failure', err: x.err, body: x.body, hit: x.hit }); });
+  edits.forEach(function(x){ chain.push({ canon: x.canon, kind: 'edit', err: false, body: x.body, hit: x.hit }); });
+  chain.sort(function(a, b){ return a.canon - b.canon; });
   if (chain.length) {
-    html += '<div class="trace-title">证据链（从早到晚，共 ' + chain.length + ' 处；优先看"工具输出"）</div>';
-    chain.slice(0, 12).forEach(function(x){
-      var pos = String(x.body).indexOf(x.hits[0]);
-      var s = Math.max(0, pos - 80), e2 = Math.min(x.body.length, pos + 120);
+    html += '<div class="trace-title">共同出错链路（共 ' + chain.length + ' 处，从早到晚）</div>';
+    chain.slice(0, 14).forEach(function(x){
+      var pos = x.hit && x.body.indexOf(x.hit) >= 0 ? x.body.indexOf(x.hit) : 0;
+      var s = Math.max(0, pos - 70), e2 = Math.min(x.body.length, pos + 130);
       var snippet = (s > 0 ? '…' : '') + x.body.slice(s, e2) + (e2 < x.body.length ? '…' : '');
-      var tag = x.role === 'tool_result' ? '工具输出' : (x.role === 'tool_call' ? '工具调用' : '助手思考');
-      html += '<div class="ev-item"><div class="ev-meta">#' + x.canon + ' · ' + tag + (x.err ? ' · <b class="bad">报错</b>' : '') + (x.canon === target ? ' · <b>当前标注</b>' : '') + ' · 命中 ' + x.hits.length + ' 个词</div>';
-      html += '<div class="ev-snippet" data-act="jumpClose" data-key="' + x.canon + '" data-kw="' + esc(x.hits[0]) + '">' + highlightSnippet(snippet, x.hits[0]) + '</div></div>';
+      var tag = x.kind === 'edit' ? '修改文件' : '工具输出';
+      html += '<div class="ev-item"><div class="ev-meta">#' + x.canon + ' · ' + tag + (x.err ? ' · <b class="bad">报错</b>' : '') + (x.canon === target ? ' · <b>当前标注</b>' : '') + ' · ' + esc(x.hit) + '</div>';
+      html += '<div class="ev-snippet" data-act="jumpClose" data-key="' + x.canon + '">' + esc(snippet) + '</div></div>';
     });
   }
-  openModal('🔍 根因追溯 · #' + target, html);
+  openModal('🔍 共同出错点 · #' + target, html);
 }
 
 function buildStepMap(t){
@@ -659,7 +669,7 @@ function renderJudgment(){
       h += '<input type="number" value="'+esc(f.step)+'" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="step"> ';
       h += '<select data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="severity">';
       Object.keys(SEV).forEach(function(k){ h += '<option value="'+k+'"'+(f.severity===k?' selected':'')+'>'+SEV[k][0]+'</option>'; });
-      h += '<button class="btn" data-act="rootcause" data-dim="'+d.key+'" data-idx="'+idx+'">🔍 根因</button> ';
+      h += '<button class="btn" data-act="rootcause" data-dim="'+d.key+'" data-idx="'+idx+'">🔍 出错点</button> ';
       h += '<button class="btn" data-act="rm" data-dim="'+d.key+'" data-idx="'+idx+'">remove</button></div>';
       h += '<textarea placeholder="问题描述 / 理由…" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="reason">'+esc(f.reason)+'</textarea></div>';
     });
