@@ -669,7 +669,7 @@ function renderJudgment(){
       h += '<input type="number" value="'+esc(f.step)+'" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="step"> ';
       h += '<select data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="severity">';
       Object.keys(SEV).forEach(function(k){ h += '<option value="'+k+'"'+(f.severity===k?' selected':'')+'>'+SEV[k][0]+'</option>'; });
-      h += '<button class="btn" data-act="rootcause" data-dim="'+d.key+'" data-idx="'+idx+'">🔍 出错点</button> ';
+      h += '</select> <button class="btn" data-act="rootcause" data-dim="'+d.key+'" data-idx="'+idx+'">🔍 出错点</button> ';
       h += '<button class="btn" data-act="rm" data-dim="'+d.key+'" data-idx="'+idx+'">remove</button></div>';
       h += '<textarea placeholder="问题描述 / 理由…" data-act="f" data-dim="'+d.key+'" data-idx="'+idx+'" data-field="reason">'+esc(f.reason)+'</textarea></div>';
     });
