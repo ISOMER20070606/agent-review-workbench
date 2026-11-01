@@ -1,5 +1,11 @@
 # 更新日志
 
+## v1.05（2026-11-01）
+
+### 新批次
+- 支持直接加载 `integrated` / `normalized` / `public` 格式（`{trajectory, annotation}`），自动转成工具内部格式
+- 效率维度**自适应**：annotation 是 `yes/no`（冗余二分类）时显示 yes/no，否则保持 `normal/low`
+
 ## v1.04（2026-10-25）
 
 ### 步骤号
