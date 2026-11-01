@@ -134,13 +134,19 @@ function conclusion(t){
 }
 function summaryHtml(t){
   var s=stats(t), c=conclusion(t), patchTxt = s.patch>0 ? ('补丁 '+s.patch+' 字') : '补丁空';
+  var ev = t.evaluation, evTxt = '';
+  if (ev) {
+    var rep = ev.official_report || {}, sv = rep.selection_and_verdict || {}, aa = sv.accepted_attempt || {};
+    if (aa.f2p_pass != null || aa.p2p_pass != null) evTxt = '<span>f2p <b>' + (aa.f2p_pass ? '✓' : '✗') + '</b> · p2p <b>' + (aa.p2p_pass ? '✓' : '✗') + '</b></span>';
+    else if (ev.resolved != null) evTxt = '<span>resolved <b>' + (ev.resolved ? 'true' : 'false') + '</b></span>';
+  }
   return '<div class="summary"><div class="concl">'+c[0]+' '+c[1]+'</div><div class="stats">'
     + '<span>共 <b>'+(t.messages||[]).length+'</b> 条消息</span>'
     + '<span>命令 <b>'+s.cmd+'</b> 次</span>'
     + '<span>编辑文件 <b>'+s.edit+'</b> 次</span>'
     + '<span>跑测试 <b>'+s.test+'</b> 次</span>'
     + '<span>助手思考 <b>'+s.think+'</b> 条</span>'
-    + '<span>'+patchTxt+'</span></div></div>';
+    + '<span>'+patchTxt+'</span>' + evTxt + '</div></div>';
 }
 function diffHtml(p){
   return String(p).split('\n').map(function(line){
@@ -261,7 +267,7 @@ function normalizeObj(obj){
     if (hasDims(obj.annotation)) ann = obj.annotation;
     else if (obj.annotation && hasDims(obj.annotation.auto)) ann = obj.annotation.auto;
     else if (obj.annotation && hasDims(obj.annotation.final)) ann = obj.annotation.final;
-    return { traj: { instance_id: tr.instance_id, problem: tr.task || '', generated_patch: tr.generated_patch || '', model: tr.model || '', messages: stepsToMessages(steps) }, ann: ann };
+    return { traj: { instance_id: tr.instance_id, problem: tr.task || '', generated_patch: tr.generated_patch || '', model: tr.model || '', messages: stepsToMessages(steps), evaluation: obj.evaluation || null }, ann: ann };
   }
   if (obj.canonical_steps && obj.problem_statement) {
     return { traj: { instance_id: obj.instance_id, problem: obj.problem_statement, generated_patch: '', model: (obj.run && obj.run.model) || '', messages: stepsToMessages(obj.canonical_steps) }, ann: null };
@@ -269,7 +275,7 @@ function normalizeObj(obj){
   return null;
 }
 function processTexts(items){
-  var trajObjs = [], annObjs = [], judgeObjs = [], unknown = [];
+  var trajObjs = [], annObjs = [], judgeObjs = [], evalObjs = [], unknown = [];
   items.forEach(function(it){
     var obj; try{ obj = JSON.parse(it.text); }catch(e){ unknown.push(it.name); return; }
     var norm = normalizeObj(obj);
@@ -285,10 +291,20 @@ function processTexts(items){
       if (norm.ann && hasDims(norm.ann)) annObjs.push({name:it.name, obj:norm.ann});
     } else if (hasDims(obj)) annObjs.push({name:it.name, obj:obj});
     else if (obj && obj.judgments && typeof obj.judgments === 'object') judgeObjs.push(obj);
+    else if (obj && obj.evaluation && obj.instance_id) evalObjs.push({ id: obj.instance_id, evaluation: obj.evaluation });
+    else if (obj && obj.official_report && obj.instance_id) evalObjs.push({ id: obj.instance_id, evaluation: obj });
     else unknown.push(it.name);
   });
   if (unknown.length) alert('这些文件格式没认出来：' + String.fromCharCode(10) + unknown.join(String.fromCharCode(10)));
   trajObjs.forEach(function(o){ addTraj(o.obj, o.label || o.name); });
+  if (evalObjs.length) {
+    evalObjs.forEach(function(x){
+      var target = null;
+      for (var i = 0; i < trajs.length; i++) if (trajs[i].id === x.id) { target = trajs[i]; break; }
+      if (!target && trajs.length === 1) target = trajs[0];
+      if (target) target.evaluation = x.evaluation;
+    });
+  }
   annObjs.forEach(function(o){ attachAnn(o.obj); });
   judgeObjs.forEach(function(o){ Object.keys(o.judgments).forEach(function(k){ state[k] = o.judgments[k]; }); });
   migrateState();
@@ -311,7 +327,12 @@ async function restoreCache(){
 }
 function addTraj(obj, filename){
   var id = obj.instance_id || filename;
-  if (trajs.some(function(t){ return t.id === id; })) return;
+  for (var ei = 0; ei < trajs.length; ei++) {
+    if (trajs[ei].id === id) {
+      if (obj.evaluation && !trajs[ei].evaluation) trajs[ei].evaluation = obj.evaluation;
+      return;
+    }
+  }
   var callStep = {}, callCanon = {}, callArgs = {};
   var canon = 0;
   var msgs = [];
@@ -330,7 +351,7 @@ function addTraj(obj, filename){
     else if(m.role==='user'){ msgs.push({role:'user', step:step, canonical:null, text:m.content}); }
   });
   trajs.push({ id: obj.instance_id || filename, label: filename.replace(/\.json$/,''), bench: (obj.instance_id||'').toLowerCase().indexOf('deepswe')>=0?'deepswe':'swepro', model: obj.model||'', problem: obj.problem||'',
-    evaluation: obj.evaluation ? {status:obj.evaluation.status, resolved:obj.evaluation.resolved, detail:(obj.evaluation.official_report&&obj.evaluation.official_report.grade&&obj.evaluation.official_report.grade.detail||'').slice(0,2000)} : null,
+    evaluation: obj.evaluation ? {status:obj.evaluation.status, resolved:obj.evaluation.resolved, official_report: obj.evaluation.official_report || null, detail:(obj.evaluation.official_report&&obj.evaluation.official_report.grade&&obj.evaluation.official_report.grade.detail||'').slice(0,2000)} : null,
     patch: obj.generated_patch||'', messages: msgs, annotation: null });
 }
 function attachAnn(obj){ for(var i=0;i<trajs.length;i++){ if(trajs[i].id===obj.instance_id){ trajs[i].annotation=obj; return; } } }
