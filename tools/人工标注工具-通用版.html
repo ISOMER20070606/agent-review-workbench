@@ -48,13 +48,6 @@ code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
 .bad{color:#b91c1c}
 .step-k{color:#2563eb;font-weight:600;cursor:pointer}
 .step-k:hover{text-decoration:underline}
-.ai-loaded{border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;margin-bottom:12px;background:#f8fafc}
-.ai-loaded-head{font-size:13px;font-weight:600;color:#374151;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.ai-dim{margin:6px 0;font-size:12.5px}
-.ai-dim .chip{background:#e0e7ff;color:#3730a3;border-radius:4px;padding:1px 6px;font-size:11.5px;margin-left:4px}
-.ai-finding{color:#4b5563;margin:3px 0 3px 10px;line-height:1.5}
-.ann-toggle{cursor:pointer;font-size:13px;font-weight:600;color:#1d4ed8;padding:6px 0;user-select:none}
-.ann-toggle:hover{text-decoration:underline}
 </style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
@@ -763,18 +756,6 @@ function applyConvert(){
   saveState(); renderJudgment(); closeModal();
   alert('已转换 ' + (__convertPlans||[]).length + ' 条，记得重新导出。');
 }
-function copyAnnotationToState(){
-  var t = trajs[curId]; if (!t || !t.annotation) return;
-  var st = getSt(curKey());
-  DIMS.forEach(function(d){
-    var x = t.annotation[d.key]; if (!x) return;
-    if (x.run_review && x.run_review.rating) st[d.key].rating = x.run_review.rating;
-    st[d.key].findings = (x.findings||[]).map(function(f){ return { step: String(f.step_id), severity: (f.rating==='fail'?'fail':'warning'), reason: String(f.reason||'') }; });
-    if (x.run_review && x.run_review.reason && !st[d.key].notes) st[d.key].notes = String(x.run_review.reason).slice(0,600);
-  });
-  saveState(); renderJudgment();
-  alert('已复制到「我的判断」，可以在此基础上改。');
-}
 function dimRatings(t, d){
   if (d.key === 'execution_efficiency' && t && t.annotation && t.annotation.execution_efficiency) {
     var r = t.annotation.execution_efficiency.run_review && t.annotation.execution_efficiency.run_review.rating;
@@ -782,29 +763,9 @@ function dimRatings(t, d){
   }
   return d.ratings;
 }
-var showAnn = false;
 function renderJudgment(){
   var st = getSt(curKey());
-  var t0 = trajs[curId];
   var h = '';
-  if (t0 && t0.annotation) {
-    var nf = 0;
-    DIMS.forEach(function(d){ nf += (((t0.annotation[d.key]||{}).findings)||[]).length; });
-    h += '<div class="ann-toggle" data-act="toggleAnn">🤖 AI 标注（' + nf + ' 条 findings）' + (showAnn ? ' ▲' : ' ▼') + '</div>';
-    if (showAnn) {
-      h += '<div class="ai-loaded"><div class="ai-loaded-head">只读，可复制后修改<button class="btn" data-act="copyAnn">⤵ 复制到我的判断</button></div>';
-      DIMS.forEach(function(d){
-        var x = t0.annotation[d.key] || {};
-        var r = (x.run_review && x.run_review.rating) || '';
-        h += '<div class="ai-dim"><b>'+esc(d.label)+'</b> <span class="chip">'+esc(r)+'</span>';
-        (x.findings||[]).forEach(function(f){
-          h += '<div class="ai-finding"><b>#'+esc(f.step_id)+'</b> · '+esc(String(f.reason||'').slice(0,180))+'</div>';
-        });
-        h += '</div>';
-      });
-      h += '</div>';
-    }
-  }
   h += '<p class="muted">先别点「Compare AI Review」。读完轨迹后按你的判断打分、补充 findings，再点右上角按钮对照。</p><p class="muted">步骤号请填 <b>#K</b>（canonical，和 AI 标注一致），不要填原始 <code>step N</code>；先点一下右侧输入框，再点消息前面的蓝色 <b>#K</b> 就能自动填入。</p>';
   DIMS.forEach(function(d){
     var s = st[d.key];
@@ -850,8 +811,6 @@ document.addEventListener('click', function(ev){
   else if(act==='aiSave'){ saveAISettings(); }
   else if(act==='applyConvert'){ applyConvert(); }
   else if(act==='rootcause'){ ev.preventDefault(); findingRootCause(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx'))); }
-  else if(act==='copyAnn'){ ev.preventDefault(); copyAnnotationToState(); }
-  else if(act==='toggleAnn'){ ev.preventDefault(); showAnn = !showAnn; renderJudgment(); }
 });
 document.addEventListener('change', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } });
 document.addEventListener('input', function(ev){ var el=ev.target; if(!el||!el.getAttribute)return; var act=el.getAttribute('data-act'); if(act==='f'){ updF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx')), el.getAttribute('data-field'), el.value); } else if(act==='note'){ updN(el.getAttribute('data-dim'), el.value); } });
