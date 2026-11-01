@@ -314,6 +314,12 @@ function processTexts(items){
   }
   annObjs.forEach(function(o){ attachAnn(o.obj); });
   judgeObjs.forEach(function(o){ Object.keys(o.judgments).forEach(function(k){ state[k] = o.judgments[k]; }); });
+  if (judgeObjs.length) {
+    var jn = 0;
+    judgeObjs.forEach(function(o){ jn += Object.keys(o.judgments).length; });
+    setCacheStatus('已载入 ' + jn + ' 条我的标注');
+    if (!trajs.length) alert('已载入你的标注（' + jn + ' 条），但还没加载轨迹文件。\n再选一个轨迹 JSON（integrated / 原始轨迹）就能对着看。');
+  }
   migrateState();
   renderSelector();
   if(trajs.length && curId===null) selectTraj(0);
