@@ -226,13 +226,50 @@ async function loadFiles(fileList){
   processTexts(items);
   byId('dropTip').style.display = 'none';
 }
+function hasDims(o){ return !!(o && (o.task_completion_quality || o.safety_privacy || o.reporting_evaluation_integrity || o.execution_efficiency)); }
+function stepsToMessages(steps){
+  var msgs = [], n = 0;
+  (steps || []).forEach(function(s){
+    var ct = (s && s.content) || {};
+    var am = ct.agent_message;
+    if (am) {
+      n++;
+      msgs.push({ role: 'assistant', content: am.content || '', tool_calls: am.tool_calls || ct.actions || [], extra: { step: n, seq: (am.extra && am.extra.seq) || s.step_id, type: (am.extra && am.extra.type) || 'agent' } });
+    } else if ((ct.actions || []).length) {
+      n++;
+      msgs.push({ role: 'assistant', content: '', tool_calls: ct.actions, extra: { step: n, seq: s.step_id, type: 'tool.started' } });
+    }
+    (ct.observations || []).forEach(function(o){ if (o) msgs.push({ role: 'tool', tool_call_id: o.tool_call_id, content: o.content }); });
+  });
+  return msgs;
+}
+function normalizeObj(obj){
+  if (!obj || typeof obj !== 'object') return null;
+  if (obj.messages && obj.problem) return { traj: obj, ann: null };
+  if (obj.trajectory && (obj.trajectory.steps || obj.trajectory.canonical_steps)) {
+    var tr = obj.trajectory;
+    var steps = tr.steps || tr.canonical_steps || [];
+    var ann = null;
+    if (hasDims(obj.annotation)) ann = obj.annotation;
+    else if (obj.annotation && hasDims(obj.annotation.auto)) ann = obj.annotation.auto;
+    else if (obj.annotation && hasDims(obj.annotation.final)) ann = obj.annotation.final;
+    return { traj: { instance_id: tr.instance_id, problem: tr.task || '', generated_patch: tr.generated_patch || '', model: tr.model || '', messages: stepsToMessages(steps) }, ann: ann };
+  }
+  if (obj.canonical_steps && obj.problem_statement) {
+    return { traj: { instance_id: obj.instance_id, problem: obj.problem_statement, generated_patch: '', model: (obj.run && obj.run.model) || '', messages: stepsToMessages(obj.canonical_steps) }, ann: null };
+  }
+  return null;
+}
 function processTexts(items){
   var trajObjs = [], annObjs = [], judgeObjs = [], unknown = [];
   items.forEach(function(it){
     var obj; try{ obj = JSON.parse(it.text); }catch(e){ unknown.push(it.name); return; }
-    if(obj && obj.messages && obj.problem) trajObjs.push({name:it.name, obj:obj});
-    else if(obj && (obj.task_completion_quality||obj.execution_efficiency||obj.safety_privacy||obj.reporting_evaluation_integrity)) annObjs.push({name:it.name, obj:obj});
-    else if(obj && obj.judgments && typeof obj.judgments === 'object') judgeObjs.push(obj);
+    var norm = normalizeObj(obj);
+    if (norm) {
+      if (norm.traj && norm.traj.messages && norm.traj.messages.length) trajObjs.push({name:it.name, obj:norm.traj});
+      if (norm.ann && hasDims(norm.ann)) annObjs.push({name:it.name, obj:norm.ann});
+    } else if (hasDims(obj)) annObjs.push({name:it.name, obj:obj});
+    else if (obj && obj.judgments && typeof obj.judgments === 'object') judgeObjs.push(obj);
     else unknown.push(it.name);
   });
   if (unknown.length) alert('这些文件格式没认出来：' + String.fromCharCode(10) + unknown.join(String.fromCharCode(10)));
@@ -655,6 +692,13 @@ function applyConvert(){
   saveState(); renderJudgment(); closeModal();
   alert('已转换 ' + (__convertPlans||[]).length + ' 条，记得重新导出。');
 }
+function dimRatings(t, d){
+  if (d.key === 'execution_efficiency' && t && t.annotation && t.annotation.execution_efficiency) {
+    var r = t.annotation.execution_efficiency.run_review && t.annotation.execution_efficiency.run_review.rating;
+    if (r === 'yes' || r === 'no') return ['yes', 'no'];
+  }
+  return d.ratings;
+}
 function renderJudgment(){
   var st = getSt(curKey());
   var h = '<p class="muted">先别点「Compare AI Review」。读完轨迹后按你的判断打分、补充 findings，再点右上角按钮对照。</p><p class="muted">步骤号请填 <b>#K</b>（canonical，和 AI 标注一致），不要填原始 <code>step N</code>；先点一下右侧输入框，再点消息前面的蓝色 <b>#K</b> 就能自动填入。</p>';
@@ -662,7 +706,7 @@ function renderJudgment(){
     var s = st[d.key];
     h += '<div class="dim"><div class="dim-head"><b>'+esc(d.label)+'</b>'+(d.zh?' <span class="muted">'+esc(d.zh)+'</span>':'')+'</div>';
     h += '<div class="rating-group">';
-    d.ratings.forEach(function(r){ var on = s.rating===r; h += '<button class="rating-btn'+(on?' on '+d.rl[r][1]:'')+'" data-act="rating" data-dim="'+d.key+'" data-val="'+r+'">'+d.rl[r][0]+'</button>'; });
+    dimRatings(trajs[curId], d).forEach(function(r){ var meta=(d.rl&&d.rl[r])||(r==='yes'?['yes','warn']:(r==='no'?['no','ok']:[r,''])); var on = s.rating===r; h += '<button class="rating-btn'+(on?' on '+meta[1]:'')+'" data-act="rating" data-dim="'+d.key+'" data-val="'+r+'">'+meta[0]+'</button>'; });
     h += '</div><div>';
     s.findings.forEach(function(f,idx){
       h += '<div class="finding"><div class="finding-row">#K ';
