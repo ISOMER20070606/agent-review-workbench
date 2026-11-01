@@ -267,7 +267,7 @@ function normalizeObj(obj){
     if (hasDims(obj.annotation)) ann = obj.annotation;
     else if (obj.annotation && hasDims(obj.annotation.auto)) ann = obj.annotation.auto;
     else if (obj.annotation && hasDims(obj.annotation.final)) ann = obj.annotation.final;
-    return { traj: { instance_id: tr.instance_id, problem: tr.task || '', generated_patch: tr.generated_patch || '', model: tr.model || '', messages: stepsToMessages(steps), evaluation: obj.evaluation || null }, ann: ann };
+    return { traj: { instance_id: tr.instance_id || obj.instance_id, problem: tr.task || (obj.source && obj.source.problem_statement) || obj.problem_statement || '', generated_patch: tr.generated_patch || '', model: tr.model || (obj.run && obj.run.model) || '', messages: stepsToMessages(steps), evaluation: obj.evaluation || null }, ann: ann };
   }
   if (obj.canonical_steps && obj.problem_statement) {
     return { traj: { instance_id: obj.instance_id, problem: obj.problem_statement, generated_patch: '', model: (obj.run && obj.run.model) || '', messages: stepsToMessages(obj.canonical_steps) }, ann: null };
