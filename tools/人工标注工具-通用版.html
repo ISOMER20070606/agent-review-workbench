@@ -48,7 +48,7 @@ code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
 .bad{color:#b91c1c}
 .step-k{color:#2563eb;font-weight:600;cursor:pointer}
 .step-k:hover{text-decoration:underline}
-</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。</div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
+</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
   {key:'safety_privacy', label:'safety_privacy', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
@@ -77,9 +77,16 @@ async function cacheSave(items){
     var st = tx.objectStore('files');
     st.clear();
     items.forEach(function(x, i){ st.put({ name: x.name, text: x.text, order: i }); });
-    await new Promise(function(res){ tx.oncomplete = res; tx.onerror = res; });
+    var failed = null;
+    await new Promise(function(res){
+      tx.oncomplete = res;
+      tx.onerror = function(){ failed = (tx.error && tx.error.message) || '写入失败'; res(); };
+      tx.onabort = function(){ failed = '事务中止（可能超出配额）'; res(); };
+    });
     db.close();
-  } catch(e) { console.warn('缓存保存失败', e); }
+    if (failed) return { ok: false, error: failed };
+    return { ok: true, count: items.length };
+  } catch(e) { console.warn('缓存保存失败', e); return { ok: false, error: e && e.message }; }
 }
 async function cacheLoad(){
   try {
@@ -222,7 +229,8 @@ async function loadFiles(fileList){
   }
   if (bad.length) alert('这些文件没读成功：' + String.fromCharCode(10) + bad.join(String.fromCharCode(10)));
   if (!items.length) return;
-  await cacheSave(items);
+  var cs = await cacheSave(items);
+  setCacheStatus(cs.ok ? ('已缓存 ' + cs.count + ' 个文件（刷新不丢）') : ('缓存失败：' + (cs.error || '未知') + '（刷新会丢）'));
   processTexts(items);
   byId('dropTip').style.display = 'none';
 }
@@ -266,14 +274,21 @@ function processTexts(items){
     var obj; try{ obj = JSON.parse(it.text); }catch(e){ unknown.push(it.name); return; }
     var norm = normalizeObj(obj);
     if (norm) {
-      if (norm.traj && norm.traj.messages && norm.traj.messages.length) trajObjs.push({name:it.name, obj:norm.traj});
+      if (norm.traj && norm.traj.messages && norm.traj.messages.length) {
+        var lb = it.name.replace(/\.json$/,'');
+        var im = String(norm.traj.instance_id||'').match(/^(?:deepswe|swepro)__(.+?)__(.+)$/);
+        if (im) lb = im[1] + ' · ' + im[2];
+        var nm = it.name.match(/^(\d{3}-\d{2})/);
+        if (nm) lb = nm[1] + ' ' + lb;
+        trajObjs.push({name:it.name, obj:norm.traj, label:lb});
+      }
       if (norm.ann && hasDims(norm.ann)) annObjs.push({name:it.name, obj:norm.ann});
     } else if (hasDims(obj)) annObjs.push({name:it.name, obj:obj});
     else if (obj && obj.judgments && typeof obj.judgments === 'object') judgeObjs.push(obj);
     else unknown.push(it.name);
   });
   if (unknown.length) alert('这些文件格式没认出来：' + String.fromCharCode(10) + unknown.join(String.fromCharCode(10)));
-  trajObjs.forEach(function(o){ addTraj(o.obj, o.name); });
+  trajObjs.forEach(function(o){ addTraj(o.obj, o.label || o.name); });
   annObjs.forEach(function(o){ attachAnn(o.obj); });
   judgeObjs.forEach(function(o){ Object.keys(o.judgments).forEach(function(k){ state[k] = o.judgments[k]; }); });
   migrateState();
@@ -284,13 +299,15 @@ async function restoreCache(){
   var saved = null, savedId = null;
   try{ saved = localStorage.getItem('anno-curId'); savedId = localStorage.getItem('anno-curTraj'); }catch(e){}
   var items = await cacheLoad();
-  if (!items.length) return;
+  if (!items.length) { setCacheStatus('没有可恢复的缓存'); return; }
+  setCacheStatus('正在恢复 ' + items.length + ' 个文件…');
   processTexts(items);
   byId('dropTip').style.display = 'none';
   var idx = -1;
   if (savedId) { for (var i = 0; i < trajs.length; i++) { if (trajs[i].id === savedId) { idx = i; break; } } }
   if (idx < 0 && saved !== null && trajs[Number(saved)]) idx = Number(saved);
   if (idx >= 0) selectTraj(idx);
+  setCacheStatus('已恢复 ' + items.length + ' 个文件');
 }
 function addTraj(obj, filename){
   var id = obj.instance_id || filename;
@@ -317,9 +334,29 @@ function addTraj(obj, filename){
     patch: obj.generated_patch||'', messages: msgs, annotation: null });
 }
 function attachAnn(obj){ for(var i=0;i<trajs.length;i++){ if(trajs[i].id===obj.instance_id){ trajs[i].annotation=obj; return; } } }
+function dimProgress(id){
+  var s = state[id]; if (!s) return 0;
+  var n = 0;
+  DIMS.forEach(function(d){ var x = s[d.key]; if (x && x.rating) n++; });
+  return n;
+}
+function setCacheStatus(msg){ var el = byId('cacheStatus'); if (el) el.textContent = msg ? ' · ' + msg : ''; }
+function refreshSelectorLabels(){
+  var sel = byId('trajSel'); if (!sel || !sel.options) return;
+  for (var i = 0; i < sel.options.length && i < trajs.length; i++) {
+    sel.options[i].textContent = trajs[i].label + '  [' + dimProgress(trajs[i].id) + '/4]';
+  }
+}
+function updateProgressInfo(){
+  var el = byId('progressInfo'); if (!el) return;
+  var full = 0, total = trajs.length;
+  trajs.forEach(function(t){ if (dimProgress(t.id) >= 4) full++; });
+  var cur = trajs[curId] ? dimProgress(trajs[curId].id) : 0;
+  el.textContent = total ? ('完成 ' + full + '/' + total + ' 条 · 当前 ' + cur + '/4') : '';
+}
 function renderSelector(){
   var sel = byId('trajSel'); sel.innerHTML='';
-  trajs.forEach(function(t,i){ var o=document.createElement('option'); o.value=String(i); o.textContent=t.label; sel.appendChild(o); });
+  trajs.forEach(function(t,i){ var o=document.createElement('option'); o.value=String(i); o.textContent=t.label+'  ['+dimProgress(t.id)+'/4]'; sel.appendChild(o); });
   if(trajs.length) sel.value = String(curId===null?0:curId);
 }
 function selectTraj(idx){ curId=idx; byId('trajSel').value=String(idx); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); if(trajs[idx]) localStorage.setItem('anno-curTraj', trajs[idx].id); }catch(e){} }
@@ -721,6 +758,7 @@ function renderJudgment(){
     h += '<div style="margin-top:8px"><span class="muted">notes: </span><textarea class="notes" placeholder="（可选）重复标注、合并到哪步等…" data-act="note" data-dim="'+d.key+'">'+esc(s.notes)+'</textarea></div></div>';
   });
   byId('judgeBody').innerHTML = h;
+  refreshSelectorLabels(); updateProgressInfo();
 }
 var lastFindingInput = null;
 document.addEventListener('focusin', function(ev){ var el = ev.target; if (el && el.getAttribute && el.getAttribute('data-act')==='f' && el.getAttribute('data-field')==='step') lastFindingInput = el; });
