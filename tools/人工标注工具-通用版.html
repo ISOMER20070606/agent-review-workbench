@@ -49,7 +49,15 @@ code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
 .step-k{color:#2563eb;font-weight:600;cursor:pointer}
 .step-k:hover{text-decoration:underline}
 .my-chip{background:#fef3c7;border-color:#fcd34d;color:#92400e;cursor:pointer}
-</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><select id="trajSel"></select><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
+.sel-wrap{position:relative;display:inline-block}
+.sel-btn{background:#111c33;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;min-width:280px;text-align:left}
+.sel-panel{position:absolute;z-index:60;top:100%;left:0;margin-top:4px;width:460px;max-height:440px;overflow:auto;background:#0b1220;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.45);display:none;padding:8px}
+.sel-panel input{width:100%;box-sizing:border-box;margin-bottom:6px;padding:6px 8px;border-radius:6px;border:1px solid #334155;background:#111c33;color:#e2e8f0;font-size:13px}
+.sel-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;color:#e2e8f0}
+.sel-row:hover{background:#16233d}
+.sel-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-badge{flex:none;background:#1e3a5f;color:#93c5fd;border-radius:4px;padding:1px 6px;font-size:11px}
+</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><div class="sel-wrap"><button id="trajBtn" class="sel-btn">（未加载）▾</button><div id="trajPanel" class="sel-panel"><input id="trajSearch" placeholder="搜索编号 / 任务名…"><div id="trajList"></div></div></div><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
   {key:'safety_privacy', label:'safety_privacy', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
@@ -283,8 +291,10 @@ function processTexts(items){
     if (norm) {
       if (norm.traj && norm.traj.messages && norm.traj.messages.length) {
         var lb = it.name.replace(/\.json$/,'');
+        var pm = lb.match(/^(\d+)_(.+?)__(?:trajectory|annotation)$/);
         var im = String(norm.traj.instance_id||'').match(/^(?:deepswe|swepro)__(.+?)__(.+)$/);
-        if (im) lb = im[1] + ' · ' + im[2];
+        if (pm) lb = pm[1] + ' ' + pm[2];
+        else if (im) lb = im[1] + ' · ' + im[2];
         var nm = it.name.match(/^(\d{3}-\d{2})/);
         if (nm) lb = nm[1] + ' ' + lb;
         trajObjs.push({name:it.name, obj:norm.traj, label:lb});
@@ -369,10 +379,25 @@ function dimProgress(id){
   return n;
 }
 function setCacheStatus(msg){ var el = byId('cacheStatus'); if (el) el.textContent = msg ? ' · ' + msg : ''; }
+function shortLabel(t){
+  var s = String(t && t.label || '');
+  var m = s.match(/^(\d+)_(.+?)__(?:trajectory|annotation)$/);
+  if (m) return m[1] + ' ' + m[2];
+  return s;
+}
+function updateTrajBtn(){
+  var b = byId('trajBtn'); if (!b) return;
+  if (trajs[curId]) b.textContent = shortLabel(trajs[curId]) + '  [' + dimProgress(trajs[curId].id) + '/4]  ▾';
+  else b.textContent = '（未加载）▾';
+}
 function refreshSelectorLabels(){
-  var sel = byId('trajSel'); if (!sel || !sel.options) return;
-  for (var i = 0; i < sel.options.length && i < trajs.length; i++) {
-    sel.options[i].textContent = trajs[i].label + '  [' + dimProgress(trajs[i].id) + '/4]';
+  updateTrajBtn();
+  var list = byId('trajList'); if (!list || !list.children) return;
+  for (var i = 0; i < list.children.length; i++) {
+    var row = list.children[i];
+    var idx = Number(row.getAttribute('data-idx'));
+    var badge = row.querySelector('.sel-badge');
+    if (badge && trajs[idx]) badge.textContent = dimProgress(trajs[idx].id) + '/4';
   }
 }
 function updateProgressInfo(){
@@ -383,11 +408,21 @@ function updateProgressInfo(){
   el.textContent = total ? ('完成 ' + full + '/' + total + ' 条 · 当前 ' + cur + '/4') : '';
 }
 function renderSelector(){
-  var sel = byId('trajSel'); sel.innerHTML='';
-  trajs.forEach(function(t,i){ var o=document.createElement('option'); o.value=String(i); o.textContent=t.label+'  ['+dimProgress(t.id)+'/4]'; sel.appendChild(o); });
-  if(trajs.length) sel.value = String(curId===null?0:curId);
+  var list = byId('trajList'); if (!list) return;
+  list.innerHTML = '';
+  var items = trajs.map(function(t,i){ return { i:i, label: shortLabel(t), p: dimProgress(t.id) }; });
+  items.sort(function(a,b){ return a.label.localeCompare(b.label, 'zh', {numeric:true}); });
+  items.forEach(function(it){
+    var row = document.createElement('div');
+    row.className = 'sel-row';
+    row.setAttribute('data-idx', String(it.i));
+    row.setAttribute('data-label', it.label);
+    row.innerHTML = '<span class="sel-name">' + esc(it.label) + '</span><span class="sel-badge">' + it.p + '/4</span>';
+    list.appendChild(row);
+  });
+  updateTrajBtn();
 }
-function selectTraj(idx){ curId=idx; byId('trajSel').value=String(idx); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); if(trajs[idx]) localStorage.setItem('anno-curTraj', trajs[idx].id); }catch(e){} }
+function selectTraj(idx){ curId=idx; updateTrajBtn(); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); if(trajs[idx]) localStorage.setItem('anno-curTraj', trajs[idx].id); }catch(e){} }
 function filterBarHtml(){
   var fs=[['all','全部'],['key','关键动作'],['assistant','助手思考'],['cmd','命令/结果']];
   return '<div class="filter-bar">'+fs.map(function(f){ return '<button class="filter-btn'+(msgFilter===f[0]?' on':'')+'" data-act="filter" data-val="'+f[0]+'">'+f[1]+'</button>'; }).join('')+'</div>';
@@ -1014,7 +1049,10 @@ function init(){
   byId('convBtn').addEventListener('click', convertSteps);
   byId('exportBtn').addEventListener('click', exportJSON);
   byId('compareBtn').addEventListener('click', revealAI);
-  byId('trajSel').addEventListener('change', function(){ selectTraj(Number(this.value)); });
+  byId('trajBtn').addEventListener('click', function(ev){ ev.stopPropagation(); var pn = byId('trajPanel'); pn.style.display = pn.style.display === 'block' ? 'none' : 'block'; });
+document.addEventListener('click', function(ev){ var pn = byId('trajPanel'); if (pn && pn.style.display === 'block' && !(ev.target.closest && ev.target.closest('.sel-wrap'))) pn.style.display = 'none'; });
+byId('trajList').addEventListener('click', function(ev){ var row = ev.target.closest && ev.target.closest('[data-idx]'); if (!row) return; selectTraj(Number(row.getAttribute('data-idx'))); byId('trajPanel').style.display = 'none'; });
+byId('trajSearch').addEventListener('input', function(){ var q = this.value.trim().toLowerCase(); var rows = byId('trajList').children; for (var i = 0; i < rows.length; i++) { var lab = rows[i].getAttribute('data-label') || ''; rows[i].style.display = (!q || lab.toLowerCase().indexOf(q) >= 0) ? '' : 'none'; } });
   var dz = byId('dropTip');
   ['dragover','dragenter'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.style.borderColor='var(--accent)'; }); });
   ['dragleave','drop'].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.style.borderColor=''; }); });
