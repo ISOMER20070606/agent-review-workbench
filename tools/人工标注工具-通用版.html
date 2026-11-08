@@ -48,7 +48,6 @@ code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
 .bad{color:#b91c1c}
 .step-k{color:#2563eb;font-weight:600;cursor:pointer}
 .step-k:hover{text-decoration:underline}
-.my-chip{background:#fef3c7;border-color:#fcd34d;color:#92400e;cursor:pointer}
 .sel-wrap{position:relative;display:inline-block}
 .sel-btn{background:#111c33;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;min-width:280px;text-align:left}
 .sel-panel{position:absolute;z-index:60;top:100%;left:0;margin-top:4px;width:460px;max-height:440px;overflow:auto;background:#0b1220;border:1px solid #334155;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.45);display:none;padding:8px}
@@ -455,14 +454,8 @@ function matchFilter(m){
   if(msgFilter==='cmd') return m.role==='tool_call' || m.role==='tool_result';
   return true;
 }
-function myStepSet(){
-  var s = getSt(curKey()), set = {};
-  DIMS.forEach(function(d){ (s[d.key].findings||[]).forEach(function(f){ var n = Number(String(f.step||'').trim()); if (Number.isFinite(n)) set[n] = (set[n]||0)+1; }); });
-  return set;
-}
 function renderMessages(){
   var t = trajs[curId]; var wrap = byId('msgList'); wrap.innerHTML='';
-  var mySet = myStepSet();
   var frag = document.createDocumentFragment();
   t.messages.forEach(function(m, idx){
     if(!matchFilter(m)) return;
@@ -480,8 +473,7 @@ function renderMessages(){
     else if(m.role==='user'){ hint='任务/输入'; hintCls=' usr'; roleHtml='<span class="role usr">👤 用户</span>'; }
     else { hint=assistantHint(m.text); hintCls=' ast'; roleHtml='<span class="role ast">💬 助手</span>'; if((m.text||'').trim()) transChip='<span class="trans-chip" data-act="translate" data-idx="'+idx+'">译</span>'; if((m.text||'').trim()) transChip+='<span class="trans-chip" data-act="trace" data-idx="'+idx+'" title="溯源：这条消息的关键点从哪来">🔗</span>'; if((m.text||'').trim()) aiChip='<span class="trans-chip ai-chip" data-act="askai" data-idx="'+idx+'" title="问 AI">🤖</span>'; }
     var prev = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : m.text);
-    var myChip = (m.canonical != null && mySet[m.canonical]) ? '<span class="my-chip" data-act="jumpFinding" data-key="'+m.canonical+'">★ 我的标注</span>' : '';
-    sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + myChip + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
+    sum.innerHTML = stepHtml + '<span class="hint'+hintCls+'">'+esc(hint)+'</span>' + roleHtml + transChip + aiChip + '<span class="preview">'+esc(trunc(prev,140))+'</span>';
     det.appendChild(sum);
     var bodyText = m.role==='tool_call' ? formatArgs(m.args) : (m.role==='tool_result' ? cleanOutput(m.text) : (m.text||''));
     var full = document.createElement('div'); full.className='full';
@@ -848,7 +840,6 @@ document.addEventListener('click', function(ev){
   else if(act==='traceDrill'){ traceDrill(el.getAttribute('data-idx'), el.getAttribute('data-kw')); }
   else if(act==='tracePop'){ tracePop(); }
   else if(act==='jumpClose'){ ev.preventDefault(); closeModal(); jumpToStep(el.getAttribute('data-key'), el.getAttribute('data-kw')); }
-  else if(act==='jumpFinding'){ ev.preventDefault(); var kk=el.getAttribute('data-key'); var ins=document.querySelectorAll('input[data-act="f"][data-field="step"]'); for(var i=0;i<ins.length;i++){ if(String(ins[i].value)===String(kk)){ ins[i].focus(); ins[i].scrollIntoView({block:'center'}); return; } } }
   else if(act==='fillstep'){ ev.preventDefault(); var kk=el.getAttribute('data-key'); if(lastFindingInput){ lastFindingInput.value=kk; lastFindingInput.dispatchEvent(new Event('input',{bubbles:true})); lastFindingInput.focus(); } else { try{ navigator.clipboard.writeText('#'+kk); }catch(e){} alert('没有聚焦的输入框，已复制 #'+kk+'；先点一下右侧 finding 的 #K 输入框，再点此按钮可直接填入'); } }
   else if(act==='aiset'){ openAISettings(); }
   else if(act==='modalClose'){ closeModal(); }
