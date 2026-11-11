@@ -118,7 +118,11 @@ code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
 .tpl-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .tpl{font-size:11px;color:#475569;border:1px dashed #cbd5e1;border-radius:10px;padding:1px 7px;cursor:pointer}
 .tpl:hover{background:#f1f5f9}
-</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><button class="btn" id="dirBtn" title="一次加载整个文件夹（integrated / normalized / annotation）">📁 加载文件夹</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><input type="file" id="memInput" accept=".json" hidden><input type="file" id="dirInput" webkitdirectory directory multiple hidden><div class="sel-wrap"><button id="trajBtn" class="sel-btn">（未加载）▾</button><div id="trajPanel" class="sel-panel"><input id="trajSearch" placeholder="搜索编号 / 任务名…"><div id="trajList"></div></div></div><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button><div class="mode-switch"><button class="mbtn on" data-act="mode" data-val="anno">标注</button><button class="mbtn" data-act="mode" data-val="review">审查</button></div><button class="btn btn-ghost" id="introBtn" title="使用说明">❓</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span><span id="loadTip" style="color:#b45309;margin-left:6px"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment<div class="tabs"><button class="tab on" data-act="tab" data-tab="judge" id="tabJudge">判断</button><button class="tab" data-act="tab" data-tab="overview" id="tabOverview">概览</button><button class="tab" data-act="tab" data-tab="timeline" id="tabTimeline">时间线</button><button class="tab" data-act="tab" data-tab="memory" id="tabMemory">记忆</button></div></div><div class="panel-body" id="judgeBody"></div><div class="panel-body" id="overviewBody" style="display:none"></div><div class="panel-body" id="timelineBody" style="display:none"></div><div class="panel-body" id="memoryBody" style="display:none"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
+.imp-line{font-size:14px;margin-bottom:8px}
+.imp-issues{margin:6px 0 8px 20px;font-size:13px;color:#92400e}
+.imp-names{font-size:11.5px;color:#64748b;margin-top:4px;line-height:1.6;max-height:160px;overflow:auto}
+.imp details{margin-top:8px;font-size:12.5px}
+</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.05</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><button class="btn" id="dirBtn" title="一次加载整个文件夹（integrated / normalized / annotation）">📁 加载文件夹</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><input type="file" id="memInput" accept=".json" hidden><input type="file" id="dirInput" webkitdirectory directory multiple hidden><div class="sel-wrap"><button id="trajBtn" class="sel-btn">（未加载）▾</button><div id="trajPanel" class="sel-panel"><input id="trajSearch" placeholder="搜索编号 / 任务名…"><div id="trajList"></div></div></div><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button><div class="mode-switch"><button class="mbtn on" data-act="mode" data-val="anno">标注</button><button class="mbtn" data-act="mode" data-val="review">审查</button></div><button class="btn btn-ghost" id="introBtn" title="使用说明">❓</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span><span id="loadTip" style="color:#b45309;margin-left:6px"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment<div class="tabs"><button class="tab on" data-act="tab" data-tab="judge" id="tabJudge">判断</button><button class="tab" data-act="tab" data-tab="overview" id="tabOverview">概览</button><button class="tab" data-act="tab" data-tab="timeline" id="tabTimeline">时间线</button><button class="tab" data-act="tab" data-tab="memory" id="tabMemory">记忆</button></div></div><div class="panel-body" id="judgeBody"></div><div class="panel-body" id="overviewBody" style="display:none"></div><div class="panel-body" id="timelineBody" style="display:none"></div><div class="panel-body" id="memoryBody" style="display:none"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'任务完成', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
   {key:'safety_privacy', label:'安全隐私', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
@@ -381,7 +385,14 @@ function processTexts(items, quiet){
     else if (obj && obj.official_report && obj.instance_id) evalObjs.push({ id: obj.instance_id, evaluation: obj });
     else unknown.push(it.name);
   });
-  if (unknown.length) { if (quiet) setCacheStatus('已忽略 ' + unknown.length + ' 个未识别文件'); else alert('这些文件格式没认出来：' + String.fromCharCode(10) + unknown.join(String.fromCharCode(10))); }
+
+  var summary = { traj: trajObjs.length, ann: annObjs.length, eval: evalObjs.length, mine: judgeObjs.length, unknown: unknown.length, unknownNames: unknown.slice(0, 20), unmatched: [] };
+  trajObjs.forEach(function(o){
+    var id = o.obj && o.obj.instance_id;
+    var hit = false;
+    for (var ai = 0; ai < annObjs.length; ai++) { if (annObjs[ai].obj && annObjs[ai].obj.instance_id === id) { hit = true; break; } }
+    if (!hit) summary.unmatched.push(id || (o.label || o.name));
+  });
   trajObjs.forEach(function(o){ addTraj(o.obj, o.label || o.name); });
   if (evalObjs.length) {
     evalObjs.forEach(function(x){
@@ -402,6 +413,7 @@ function processTexts(items, quiet){
   migrateState();
   renderSelector();
   if(trajs.length && curId===null) selectTraj(0);
+  showImportSummary(summary);
 }
 async function restoreCache(){
   var saved = null, savedId = null;
@@ -924,6 +936,29 @@ function showIntro(){
   try {
     byId('introDont').addEventListener('change', function(){ try { localStorage.setItem('anno-intro-seen', this.checked ? '1' : ''); } catch(e) {} });
   } catch(e) {}
+}
+function showImportSummary(s){
+  if (!s) return;
+  var parts = ['轨迹 ' + s.traj];
+  if (s.ann) parts.push('标注 ' + s.ann);
+  if (s.eval) parts.push('评测 ' + s.eval);
+  if (s.mine) parts.push('我的标注 ' + s.mine);
+  var line = parts.join(' · ');
+  for (var i = 0; i < trajs.length; i++) if (trajs[i].annotation) { line += ' · 已配对 ' + trajs.filter(function(t){ return t.annotation; }).length + ' 对'; break; }
+  setCacheStatus(line);
+  var issues = [];
+  if (s.traj && s.ann === 0) issues.push('没有找到标注文件（annotation）：可以标注，但没法对比 AI。');
+  if (s.ann && s.traj === 0) issues.push('只有标注、没有轨迹：请把轨迹文件一起选上。');
+  if (s.traj > s.ann && s.ann > 0) issues.push('有 ' + (s.traj - s.ann) + ' 条轨迹没配到标注（annotation 的 instance_id 要和轨迹一致）。');
+  if (s.ann > s.traj) issues.push('有标注没有对应轨迹（缺轨迹文件）。');
+  if (s.unknown) issues.push('有 ' + s.unknown + ' 个文件没识别（可能是 logs / 无关 JSON）。');
+  if (!issues.length) return;
+  var h = '<div class="imp"><div class="imp-line"><b>' + esc(line) + '</b></div>';
+  h += '<ul class="imp-issues">' + issues.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  if (s.unmatched && s.unmatched.length) h += '<details><summary>没配到标注的轨迹（' + s.unmatched.length + '）</summary><div class="imp-names">' + s.unmatched.slice(0, 20).map(esc).join('<br>') + '</div></details>';
+  if (s.unknownNames && s.unknownNames.length) h += '<details><summary>未识别文件（' + s.unknownNames.length + '）</summary><div class="imp-names">' + s.unknownNames.map(esc).join('<br>') + '</div></details>';
+  h += '<p class="muted">配对规则：轨迹的 instance_id 与 annotation 的 instance_id 完全一致。</p></div>';
+  openModal('📥 导入结果', h);
 }
 function renderMemory(){
   var el = byId('memoryBody'); if (!el) return;
