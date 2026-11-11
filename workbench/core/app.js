@@ -1031,6 +1031,7 @@ function pluginCtx(){
     traj: function(){ return trajs[curId]; },
     state: function(){ return getSt(curKey()); },
     dims: DIMS, esc: esc, trunc: trunc,
+    memory: function(){ return memLib || BUILTIN_MEM; },
     openModal: openModal, closeModal: closeModal,
     setTab: switchTab, jump: jumpToStep
   };
