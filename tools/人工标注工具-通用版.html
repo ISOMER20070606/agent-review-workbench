@@ -85,7 +85,23 @@ code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
 .tl-item.rep{border-left-color:#2563eb}
 .tl-head{font-size:12px;font-weight:600;color:#334155}
 .tl-text{font-size:12px;color:#64748b;line-height:1.5;margin-top:2px}
-</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><div class="sel-wrap"><button id="trajBtn" class="sel-btn">（未加载）▾</button><div id="trajPanel" class="sel-panel"><input id="trajSearch" placeholder="搜索编号 / 任务名…"><div id="trajList"></div></div></div><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment<div class="tabs"><button class="tab on" data-act="tab" data-tab="judge">判断</button><button class="tab" data-act="tab" data-tab="overview">概览</button><button class="tab" data-act="tab" data-tab="timeline">时间线</button></div></div><div class="panel-body" id="judgeBody"></div><div class="panel-body" id="overviewBody" style="display:none"></div><div class="panel-body" id="timelineBody" style="display:none"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
+.mode-switch{display:inline-flex;border:1px solid #334155;border-radius:8px;overflow:hidden;margin-left:6px}
+.mbtn{background:transparent;color:#cbd5e1;border:none;padding:6px 12px;font-size:12.5px;cursor:pointer}
+.mbtn.on{background:#1d4ed8;color:#fff}
+.intro h3{margin:14px 0 6px}
+.intro ol{margin:6px 0 10px 20px}
+.intro li{margin:4px 0}
+.intro-actions{display:flex;justify-content:space-between;align-items:center;margin-top:14px}
+.mem-empty{padding:20px;text-align:center;color:#64748b;line-height:1.8}
+.mem-head{font-weight:600;margin-bottom:4px}
+.mem-stats{font-size:12px;color:#64748b;margin-bottom:10px}
+.mem-table{width:100%;border-collapse:collapse;font-size:12px}
+.mem-table th,.mem-table td{border:1px solid #e5e7eb;padding:4px 6px;text-align:left}
+.mem-table th{background:#f3f4f6}
+.mem-rule{color:#64748b}
+.mem-table td:nth-child(2){white-space:nowrap}
+.mem-table td:nth-child(3){text-align:right}
+</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><input type="file" id="memInput" accept=".json" hidden><div class="sel-wrap"><button id="trajBtn" class="sel-btn">（未加载）▾</button><div id="trajPanel" class="sel-panel"><input id="trajSearch" placeholder="搜索编号 / 任务名…"><div id="trajList"></div></div></div><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button><div class="mode-switch"><button class="mbtn on" data-act="mode" data-val="anno">标注</button><button class="mbtn" data-act="mode" data-val="review">审查</button></div><button class="btn btn-ghost" id="introBtn" title="使用说明">❓</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment<div class="tabs"><button class="tab on" data-act="tab" data-tab="judge" id="tabJudge">判断</button><button class="tab" data-act="tab" data-tab="overview" id="tabOverview">概览</button><button class="tab" data-act="tab" data-tab="timeline" id="tabTimeline">时间线</button><button class="tab" data-act="tab" data-tab="memory" id="tabMemory">记忆</button></div></div><div class="panel-body" id="judgeBody"></div><div class="panel-body" id="overviewBody" style="display:none"></div><div class="panel-body" id="timelineBody" style="display:none"></div><div class="panel-body" id="memoryBody" style="display:none"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
   {key:'task_completion_quality', label:'任务完成', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
   {key:'safety_privacy', label:'安全隐私', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
@@ -827,6 +843,58 @@ function dimRatings(t, d){
   }
   return d.ratings;
 }
+var mode = 'anno', memLib = null;
+function applyMode(){
+  try { mode = localStorage.getItem('anno-mode') || 'anno'; } catch(e) { mode = 'anno'; }
+  var review = mode === 'review';
+  ['tabTimeline','tabMemory'].forEach(function(id){ var b = byId(id); if (b) b.style.display = review ? '' : 'none'; });
+  var cb = byId('compareBtn'); if (cb) cb.style.display = review ? '' : 'none';
+  var mb = document.querySelectorAll ? document.querySelectorAll('.mbtn') : [];
+  for (var i = 0; i < mb.length; i++) { mb[i].className = 'mbtn' + (mb[i].getAttribute('data-val') === mode ? ' on' : ''); }
+  if (!review) {
+    var cur = byId('tabTimeline'), mcur = byId('tabMemory');
+    var active = (cur && cur.className.indexOf('on') >= 0) || (mcur && mcur.className.indexOf('on') >= 0);
+    if (active) switchTab('judge');
+  }
+}
+function setMode(m){
+  try { localStorage.setItem('anno-mode', m); } catch(e) {}
+  applyMode();
+}
+function showIntro(){
+  var html = '<div class="intro">'
+    + '<p>这是给 <b>标注员 / 复核人 / 研究者</b> 用的轨迹审阅工作台。</p>'
+    + '<h3>3 步开始</h3>'
+    + '<ol>'
+    + '<li><b>加载</b>：点「加载轨迹/标注 JSON」，把 trajectory 和 annotation 一起选（工具自动配对）。</li>'
+    + '<li><b>判断</b>：读轨迹 → 四个维度打分 → 点消息前的蓝色 #K 填步骤 → 写理由。</li>'
+    + '<li><b>出结论</b>：概览看风险 → 导出 JSON。</li>'
+    + '</ol>'
+    + '<p class="muted">「标注」模式只保留最常用的视图；需要时间线、记忆库、对比 AI 时，点右上角切到「审查」。</p>'
+    + '<div class="intro-actions"><label><input type="checkbox" id="introDont"> 下次不再显示</label><button class="btn btn-primary" data-act="introClose">开始标注</button></div>'
+    + '</div>';
+  openModal('👋 欢迎使用轨迹标注工作台', html);
+  try {
+    byId('introDont').addEventListener('change', function(){ try { localStorage.setItem('anno-intro-seen', this.checked ? '1' : ''); } catch(e) {} });
+  } catch(e) {}
+}
+function renderMemory(){
+  var el = byId('memoryBody'); if (!el) return;
+  if (!memLib) {
+    el.innerHTML = '<div class="mem-empty">还没有加载记忆库。<br>先运行 <code>dreaming/dream.py</code> 生成 <code>memory/memory.json</code>，再点下面加载。</div><button class="btn" data-act="loadMem">📂 加载 memory.json</button>';
+    return;
+  }
+  var m = memLib, st = m.stats || {};
+  var h = '<div class="mem-head">记忆库 · ' + esc(m.generated_at || '') + '</div>';
+  h += '<div class="mem-stats">' + (st.cases||0) + ' 条标注 · ' + (st.findings||0) + ' findings · '
+     + (st.invalid_steps||0) + ' 无效步骤 · ' + (st.weak_evidence||0) + ' 证据弱 · ' + (st.severity_conflicts||0) + ' 口径冲突</div>';
+  h += '<table class="mem-table"><tr><th>判例模式</th><th>维度</th><th>条数</th><th>规则</th></tr>';
+  (m.patterns || []).filter(function(x){ return x.count; }).forEach(function(x){
+    h += '<tr><td>' + esc(x.name) + '</td><td>' + esc(({task:'任务',safety:'安全',reporting:'报告',eff:'冗余'})[x.dimension] || x.dimension) + '</td><td>' + x.count + '</td><td class="mem-rule">' + esc(String(x.rule||'').slice(0, 60)) + '…</td></tr>';
+  });
+  h += '</table>';
+  el.innerHTML = h;
+}
 function collectFindings(){
   var st = getSt(curKey()), out = [];
   DIMS.forEach(function(d){
@@ -917,7 +985,7 @@ function renderTimeline(){
 }
 
 function switchTab(name){
-  ['judge','overview','timeline'].forEach(function(k){
+  ['judge','overview','timeline','memory'].forEach(function(k){
     var b = byId(k + 'Body'); if (b) b.style.display = (k === name ? '' : 'none');
   });
   var btns = document.querySelectorAll ? document.querySelectorAll('.tab') : [];
@@ -955,6 +1023,9 @@ document.addEventListener('click', function(ev){
   var act = el.getAttribute('data-act'); if(!act) return;
   if(act==='tab'){ ev.preventDefault(); switchTab(el.getAttribute('data-tab')); }
   else if(act==='jumpstep'){ ev.preventDefault(); jumpToStep(Number(el.getAttribute('data-key'))); }
+  else if(act==='mode'){ ev.preventDefault(); setMode(el.getAttribute('data-val')); }
+  else if(act==='loadMem'){ ev.preventDefault(); byId('memInput').click(); }
+  else if(act==='introClose'){ ev.preventDefault(); closeModal(); }
   else if(act==='rating'){ setRating(el.getAttribute('data-dim'), el.getAttribute('data-val')); }
   else if(act==='add'){ addF(el.getAttribute('data-dim')); }
   else if(act==='rm'){ rmF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx'))); }
@@ -1157,11 +1228,20 @@ async function exportJSON(){
 function init(){
   try { var s = document.createElement('script'); s.src = 'ai-config.js'; s.onerror = function(){}; document.head.appendChild(s); } catch(e){}
   loadState();
+  applyMode();
+  try { if (!localStorage.getItem('anno-intro-seen')) showIntro(); } catch(e){}
   var reviewer = localStorage.getItem('anno-reviewer') || '';
   byId('reviewerInput').value = reviewer;
   byId('reviewerInput').addEventListener('input', function(){ localStorage.setItem('anno-reviewer', this.value); });
   byId('loadBtn').addEventListener('click', function(){ byId('fileInput').click(); });
   byId('fileInput').addEventListener('change', function(){ loadFiles(this.files); this.value=''; });
+  byId('memInput').addEventListener('change', function(){
+    var f = this.files && this.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){ try { memLib = JSON.parse(rd.result); renderMemory(); switchTab('memory'); } catch(e){ alert('memory.json 解析失败：' + e.message); } };
+    rd.readAsText(f); this.value = '';
+  });
+  byId('introBtn').addEventListener('click', function(){ showIntro(); });
   byId('mtEmailBtn').addEventListener('click', function(){ var cur=''; try{ cur=localStorage.getItem('mt-email')||''; }catch(e){} var v=prompt('翻译邮箱（MyMemory 用它提高每日额度，可留空）:', cur); if(v!==null){ try{ localStorage.setItem('mt-email', v.trim()); }catch(e){} alert('已保存：'+(v.trim()||'(空)')); } });
   byId('aiSetBtn').addEventListener('click', openAISettings);
   byId('convBtn').addEventListener('click', convertSteps);
