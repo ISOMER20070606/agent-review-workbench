@@ -1,0 +1,23 @@
+{
+  "name": "agent-review-workbench",
+  "displayName": "Agent Review Workbench",
+  "description": "轨迹人工标注与审查工作台",
+  "version": "0.1.0",
+  "publisher": "isomer2007",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "reviewWorkbench.open",
+        "title": "打开轨迹标注工作台"
+      }
+    ]
+  }
+}
