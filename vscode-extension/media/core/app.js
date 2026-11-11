@@ -838,6 +838,7 @@ function showIntro(){
     byId('introDont').addEventListener('change', function(){ try { localStorage.setItem('anno-intro-seen', this.checked ? '1' : ''); } catch(e) {} });
   } catch(e) {}
 }
+var importModalOpen = false;
 function showImportSummary(s){
   if (!s) return;
   var parts = ['轨迹 ' + s.traj];
@@ -853,12 +854,13 @@ function showImportSummary(s){
   if (s.traj > s.ann && s.ann > 0) issues.push('有 ' + (s.traj - s.ann) + ' 条轨迹没配到标注（annotation 的 instance_id 要和轨迹一致）。');
   if (s.ann > s.traj) issues.push('有标注没有对应轨迹（缺轨迹文件）。');
   if (s.unknown) issues.push('有 ' + s.unknown + ' 个文件没识别（可能是 logs / 无关 JSON）。');
-  if (!issues.length) return;
+  if (!issues.length) { if (importModalOpen) { closeModal(); importModalOpen = false; } return; }
   var h = '<div class="imp"><div class="imp-line"><b>' + esc(line) + '</b></div>';
   h += '<ul class="imp-issues">' + issues.map(function(x){ return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
   if (s.unmatched && s.unmatched.length) h += '<details><summary>没配到标注的轨迹（' + s.unmatched.length + '）</summary><div class="imp-names">' + s.unmatched.slice(0, 20).map(esc).join('<br>') + '</div></details>';
   if (s.unknownNames && s.unknownNames.length) h += '<details><summary>未识别文件（' + s.unknownNames.length + '）</summary><div class="imp-names">' + s.unknownNames.map(esc).join('<br>') + '</div></details>';
   h += '<p class="muted">配对规则：轨迹的 instance_id 与 annotation 的 instance_id 完全一致。</p></div>';
+  importModalOpen = true;
   openModal('📥 导入结果', h);
 }
 function renderMemory(){
@@ -1032,6 +1034,8 @@ function pluginCtx(){
     state: function(){ return getSt(curKey()); },
     dims: DIMS, esc: esc, trunc: trunc,
     memory: function(){ return memLib || BUILTIN_MEM; },
+    allState: function(){ return state; },
+    allTrajs: function(){ return trajs; },
     openModal: openModal, closeModal: closeModal,
     setTab: switchTab, jump: jumpToStep
   };
