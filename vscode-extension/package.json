@@ -2,7 +2,7 @@
   "name": "agent-review-workbench",
   "displayName": "Agent Review Workbench",
   "description": "轨迹人工标注与审查工作台",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "isomer2007",
   "engines": {
     "vscode": "^1.80.0"
