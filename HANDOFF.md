@@ -45,10 +45,18 @@ python 上交实习\dreaming\dream.py
 ```
 输出到 `上交实习\memory\`。需要 Python 3（DSH 自带或系统 Python 均可）。
 
+## 三·五、插件形态（已完成）
+
+- `review-workbench/`：文件夹插件版（index.html + core/ + plugins/）
+  - 插件 API：`ReviewPlugins.register({id,title,render(el,ctx)})`
+  - 已有插件：案例库 `plugins/cases.js`、校准 `plugins/calibration.js`
+- `vscode-extension/`：VS Code 扩展（命令面板「打开轨迹标注工作台」）
+  - 安装：`vsce package` → 安装 .vsix
+
 ## 四、下一步（未做）
 
 1. **导入向导**：识别结果摘要（识别到 N 轨迹 / M 标注 / 配对 X 对）
-2. **插件拆分**：core / views / manifest（会议三.2）
+2. ~~插件拆分~~（已完成：workbench/ + vscode-extension/）
 3. **案例库**：5 个教学案例（144/177/73/161/115）
 4. ~~JSONL 适配器~~（已完成：JSONL / 纯消息数组）
 5. **校准日志**：记录「建议 vs 实际」差异，作为论文数据
