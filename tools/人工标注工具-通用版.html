@@ -56,12 +56,41 @@ code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:12px}
 .sel-row:hover{background:#16233d}
 .sel-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sel-badge{flex:none;background:#1e3a5f;color:#93c5fd;border-radius:4px;padding:1px 6px;font-size:11px}
-</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><div class="sel-wrap"><button id="trajBtn" class="sel-btn">（未加载）▾</button><div id="trajPanel" class="sel-panel"><input id="trajSearch" placeholder="搜索编号 / 任务名…"><div id="trajList"></div></div></div><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment</div><div class="panel-body" id="judgeBody"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
+.tabs{margin-left:auto;display:flex;gap:4px}
+.tab{background:transparent;border:1px solid #cbd5e1;color:#475569;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer}
+.tab.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+.ov-verdict{font-size:15px;font-weight:600;margin-bottom:10px}
+.ov-dims{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.ov-dim{background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:8px;text-align:center}
+.ov-dim-t{font-size:11.5px;color:#64748b;margin-bottom:4px}
+.ov-dim-r{font-size:14px;font-weight:700}
+.ov-dim-r.bad{color:#b91c1c}.ov-dim-r.warn{color:#b45309}.ov-dim-r.ok{color:#047857}
+.ov-dim-n{font-size:11px;color:#94a3b8;margin-top:2px}
+.ov-sub{font-size:12.5px;color:#64748b;margin:10px 0 6px}
+.ov-risk{display:flex;gap:6px;align-items:flex-start;padding:7px 9px;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:6px;font-size:12.5px;cursor:pointer;line-height:1.5}
+.ov-risk:hover{background:#f8fafc}
+.ov-sev{flex:none;font-size:11px;padding:1px 6px;border-radius:4px;color:#fff}
+.ov-sev.bad{background:#b91c1c}.ov-sev.warn{background:#b45309}
+.ov-eval{margin-top:10px;font-size:12.5px;color:#475569}
+.tl-bar{position:relative;height:18px;background:#f1f5f9;border-radius:6px;margin:6px 0 2px}
+.tl-dot{position:absolute;top:3px;width:8px;height:12px;border-radius:2px;transform:translateX(-50%)}
+.tl-dot.bad{background:#b91c1c}.tl-dot.warn{background:#d97706}.tl-dot.err{background:#f43f5e}.tl-dot.rep{background:#2563eb}
+.tl-axis{display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-bottom:8px}
+.tl-list{margin-top:6px}
+.tl-item{border-left:3px solid #cbd5e1;padding:6px 0 6px 10px;margin-bottom:6px;cursor:pointer}
+.tl-item:hover{background:#f8fafc}
+.tl-item.bad{border-left-color:#b91c1c}
+.tl-item.warn{border-left-color:#d97706}
+.tl-item.err{border-left-color:#f43f5e}
+.tl-item.rep{border-left-color:#2563eb}
+.tl-head{font-size:12px;font-weight:600;color:#334155}
+.tl-text{font-size:12px;color:#64748b;line-height:1.5;margin-top:2px}
+</style></head><body><header><h1>🧭 轨迹人工标注工具（通用版） <span style="font-size:12px;opacity:.7">v1.04</span></h1><button class="btn btn-primary" id="loadBtn">📂 加载轨迹/标注 JSON</button><input type="file" id="fileInput" multiple accept=".json,.jsonl" hidden><div class="sel-wrap"><button id="trajBtn" class="sel-btn">（未加载）▾</button><div id="trajPanel" class="sel-panel"><input id="trajSearch" placeholder="搜索编号 / 任务名…"><div id="trajList"></div></div></div><span id="progressInfo" style="font-size:12px;color:#475569;margin-left:4px"></span><input type="text" id="reviewerInput" placeholder="标注人姓名"><button class="btn btn-ghost" id="mtEmailBtn" title="设置翻译邮箱（提高额度）">⚙️ 翻译</button><button class="btn btn-ghost" id="aiSetBtn" title="配置 AI 接口">⚙️ AI</button><button class="btn btn-ghost" id="convBtn" title="把旧标注的 raw step 转成 #K">🔄 转换步骤</button><button class="btn btn-ghost" id="exportBtn">💾 导出</button><button class="btn btn-primary" id="compareBtn">🔍 对比 AI 审核</button></header><div class="tipbar">💡 点「加载轨迹/标注 JSON」，把某条轨迹的原始 JSON 和它对应的 annotation JSON 一起选上，工具会自动识别并配对；也可以直接把文件拖进来。<span id="cacheStatus" style="color:#0369a1"></span></div><main><section class="panel"><div class="panel-head">📜 原始轨迹 <span class="muted" id="trajTitle"></span></div><div class="panel-body" id="trajBody"><div class="drop" id="dropTip">还没有加载数据<br>点右上角「加载轨迹/标注 JSON」，或把 JSON 文件拖到这里</div></section><section class="panel"><div class="panel-head">✍️ My Judgment<div class="tabs"><button class="tab on" data-act="tab" data-tab="judge">判断</button><button class="tab" data-act="tab" data-tab="overview">概览</button><button class="tab" data-act="tab" data-tab="timeline">时间线</button></div></div><div class="panel-body" id="judgeBody"></div><div class="panel-body" id="overviewBody" style="display:none"></div><div class="panel-body" id="timelineBody" style="display:none"></div></section></main><div class="panel" id="comparePanel"><div class="panel-head">🔍 AI Review Comparison</div><div class="panel-body" id="compareBody"></div></div><script>
 const DIMS = [
-  {key:'task_completion_quality', label:'task_completion_quality', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
-  {key:'safety_privacy', label:'safety_privacy', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
-  {key:'reporting_evaluation_integrity', label:'reporting_evaluation_integrity', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
-  {key:'execution_efficiency', label:'redundancy_repetition', zh:'冗余和重复', ratings:['normal','low'], rl:{normal:['normal','ok'],low:['low','warn']}}
+  {key:'task_completion_quality', label:'任务完成', ratings:['pass','fail'], rl:{pass:['pass','ok'],fail:['fail','bad']}},
+  {key:'safety_privacy', label:'安全隐私', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
+  {key:'reporting_evaluation_integrity', label:'报告诚实', ratings:['pass','warning','fail'], rl:{pass:['pass','ok'],warning:['warning','warn'],fail:['fail','bad']}},
+  {key:'execution_efficiency', label:'冗余和重复', ratings:['normal','low'], rl:{normal:['normal','ok'],low:['low','warn']}}
 ];
 const SEV = {warning:['warning','warn'],fail:['fail','bad']};
 let trajs = [], curId = null, state = {}, transCache = {}, msgFilter = 'all';
@@ -421,7 +450,7 @@ function renderSelector(){
   });
   updateTrajBtn();
 }
-function selectTraj(idx){ curId=idx; updateTrajBtn(); renderTraj(); renderJudgment(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); if(trajs[idx]) localStorage.setItem('anno-curTraj', trajs[idx].id); }catch(e){} }
+function selectTraj(idx){ curId=idx; updateTrajBtn(); renderTraj(); renderJudgment(); renderOverview(); renderTimeline(); byId('comparePanel').style.display='none'; byId('compareBtn').style.display=''; try{ localStorage.setItem('anno-curId', String(idx)); if(trajs[idx]) localStorage.setItem('anno-curTraj', trajs[idx].id); }catch(e){} }
 function filterBarHtml(){
   var fs=[['all','全部'],['key','关键动作'],['assistant','助手思考'],['cmd','命令/结果']];
   return '<div class="filter-bar">'+fs.map(function(f){ return '<button class="filter-btn'+(msgFilter===f[0]?' on':'')+'" data-act="filter" data-val="'+f[0]+'">'+f[1]+'</button>'; }).join('')+'</div>';
@@ -798,6 +827,102 @@ function dimRatings(t, d){
   }
   return d.ratings;
 }
+function collectFindings(){
+  var st = getSt(curKey()), out = [];
+  DIMS.forEach(function(d){
+    (st[d.key].findings||[]).forEach(function(f){
+      var n = Number(String(f.step||'').trim());
+      out.push({ dim: d, step: isFinite(n) ? n : null, sev: f.severity || 'warning', reason: String(f.reason||'') });
+    });
+  });
+  out.sort(function(a,b){
+    var rank = { fail: 0, warning: 1 };
+    if (rank[a.sev] !== rank[b.sev]) return rank[a.sev] - rank[b.sev];
+    return (a.step||0) - (b.step||0);
+  });
+  return out;
+}
+function renderOverview(){
+  var el = byId('overviewBody'); if (!el) return;
+  var t = trajs[curId]; if (!t) { el.innerHTML = ''; return; }
+  var st = getSt(curKey()), cc = conclusion(t), fs2 = collectFindings();
+  var h = '<div class="ov-verdict">' + cc[0] + ' ' + cc[1] + '</div>';
+  h += '<div class="ov-dims">';
+  DIMS.forEach(function(d){
+    var x = st[d.key], r = x.rating || '—', n = (x.findings||[]).length;
+    var cls = (r === 'fail' || r === 'low') ? 'bad' : ((r === 'warning' || r === 'yes') ? 'warn' : ((r === 'pass' || r === 'normal' || r === 'no') ? 'ok' : ''));
+    h += '<div class="ov-dim"><div class="ov-dim-t">' + esc(d.zh || d.label) + '</div><div class="ov-dim-r ' + cls + '">' + esc(r) + '</div><div class="ov-dim-n">' + n + ' 条</div></div>';
+  });
+  h += '</div>';
+  var top = fs2.slice(0, 3);
+  if (top.length) {
+    h += '<div class="ov-sub">重点风险</div>';
+    top.forEach(function(f){
+      h += '<div class="ov-risk" data-act="jumpstep" data-key="' + (f.step == null ? '' : f.step) + '">'
+        + '<span class="ov-sev ' + (f.sev === 'fail' ? 'bad' : 'warn') + '">' + esc(f.sev) + '</span>'
+        + '<b>#' + (f.step == null ? '?' : f.step) + '</b> ' + esc(f.dim.zh || f.dim.label) + '：' + esc(trunc(f.reason, 90)) + '</div>';
+    });
+  }
+  if (t.evaluation) {
+    var rep = t.evaluation.official_report || {}, sv = rep.selection_and_verdict || {}, aa = sv.accepted_attempt || {};
+    if (aa.f2p_pass != null || aa.p2p_pass != null) h += '<div class="ov-eval">评测：f2p ' + (aa.f2p_pass ? '✓' : '✗') + ' · p2p ' + (aa.p2p_pass ? '✓' : '✗') + '</div>';
+    else if (t.evaluation.resolved != null) h += '<div class="ov-eval">评测：resolved ' + (t.evaluation.resolved ? 'true' : 'false') + '</div>';
+  }
+  el.innerHTML = h;
+}
+function unesc(s){
+  return String(s == null ? '' : s)
+    .replace(/\\+u([0-9a-fA-F]{4})/g, function(_, h){ return String.fromCharCode(parseInt(h, 16)); })
+    .replace(/\\+n/g, ' ').replace(/\\+"/g, '"');
+}
+function renderTimeline(){
+  var el = byId('timelineBody'); if (!el) return;
+  var t = trajs[curId]; if (!t) { el.innerHTML = ''; return; }
+  var myF = collectFindings(), nodes = [];
+  var lastAst = null;
+  for (var i = t.messages.length - 1; i >= 0; i--) { var m = t.messages[i]; if (m.role === 'assistant' && (m.text || '').trim()) { lastAst = m; break; } }
+  var seenErr = {}, errs = [];
+  t.messages.forEach(function(m){
+    if (m.role !== 'tool_result' || m.canonical == null) return;
+    var raw = unesc(cleanOutput(m.text)).replace(/\s+/g, ' ');
+    if (!/Traceback \(most recent call last\)|FAILED\b|^\s*Error:|fatal:|command not found|No such file or directory/i.test(raw)) return;
+    if (/pip is available|Successfully installed|Requirement already satisfied/i.test(raw)) return;
+    var key = raw.slice(0, 60); if (seenErr[key]) return; seenErr[key] = 1;
+    errs.push({ step: m.canonical, type: 'err', text: trunc(raw, 110) });
+  });
+  errs = errs.slice(0, 8);
+  nodes = nodes.concat(errs);
+  if (lastAst) nodes.push({ step: lastAst.canonical, type: 'report', text: trunc(unesc(lastAst.text), 110) });
+  myF.forEach(function(f){ if (f.step != null) nodes.push({ step: f.step, type: 'finding', sev: f.sev, dim: (f.dim.label), text: f.reason }); });
+  nodes.sort(function(a,b){ return a.step - b.step; });
+  var seen = {}, uniq = [];
+  nodes.forEach(function(n){ var k = n.step + '|' + n.type + '|' + (n.text||'').slice(0,20); if (!seen[k]) { seen[k] = 1; uniq.push(n); } });
+  nodes = uniq;
+  var maxStep = 1; t.messages.forEach(function(m){ if (m.canonical > maxStep) maxStep = m.canonical; });
+  var bar = '<div class="tl-bar">';
+  nodes.forEach(function(n){
+    var cls = n.type === 'finding' ? (n.sev === 'fail' ? 'bad' : 'warn') : (n.type === 'err' ? 'err' : 'rep');
+    bar += '<span class="tl-dot ' + cls + '" style="left:' + (n.step / maxStep * 100).toFixed(2) + '%" title="#' + n.step + '"></span>';
+  });
+  bar += '</div><div class="tl-axis"><span>#1</span><span>#' + maxStep + '</span></div>';
+  var list = '';
+  nodes.slice(0, 30).forEach(function(n){
+    var cls, head;
+    if (n.type === 'finding') { cls = n.sev === 'fail' ? 'bad' : 'warn'; head = (n.sev === 'fail' ? '✖' : '⚠') + ' #' + n.step + ' · ' + n.dim; }
+    else if (n.type === 'err') { cls = 'err'; head = '⚠ #' + n.step + ' · 报错'; }
+    else { cls = 'rep'; head = '💬 #' + n.step + ' · 最终汇报'; }
+    list += '<div class="tl-item ' + cls + '" data-act="jumpstep" data-key="' + n.step + '"><div class="tl-head">' + esc(head) + '</div><div class="tl-text">' + esc(trunc(n.text || '', 150)) + '</div></div>';
+  });
+  el.innerHTML = '<div class="tl">' + bar + '<div class="tl-list">' + (list || '<div class="empty">这条还没有标注，先切到「判断」写几条</div>') + '</div></div>';
+}
+
+function switchTab(name){
+  ['judge','overview','timeline'].forEach(function(k){
+    var b = byId(k + 'Body'); if (b) b.style.display = (k === name ? '' : 'none');
+  });
+  var btns = document.querySelectorAll ? document.querySelectorAll('.tab') : [];
+  for (var i = 0; i < btns.length; i++) { if (btns[i].getAttribute('data-tab') === name) btns[i].className = 'tab on'; else btns[i].className = 'tab'; }
+}
 function renderJudgment(){
   var st = getSt(curKey());
   var h = '';
@@ -828,7 +953,9 @@ document.addEventListener('focusin', function(ev){ var el = ev.target; if (el &&
 document.addEventListener('click', function(ev){
   var el = ev.target; if(!el || !el.getAttribute) return;
   var act = el.getAttribute('data-act'); if(!act) return;
-  if(act==='rating'){ setRating(el.getAttribute('data-dim'), el.getAttribute('data-val')); }
+  if(act==='tab'){ ev.preventDefault(); switchTab(el.getAttribute('data-tab')); }
+  else if(act==='jumpstep'){ ev.preventDefault(); jumpToStep(Number(el.getAttribute('data-key'))); }
+  else if(act==='rating'){ setRating(el.getAttribute('data-dim'), el.getAttribute('data-val')); }
   else if(act==='add'){ addF(el.getAttribute('data-dim')); }
   else if(act==='rm'){ rmF(el.getAttribute('data-dim'), Number(el.getAttribute('data-idx'))); }
   else if(act==='filter'){ msgFilter = el.getAttribute('data-val'); renderTraj(); }
