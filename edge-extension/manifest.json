@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Agent Review Workbench",
+  "version": "0.1.0",
+  "description": "轨迹人工标注与审查工作台（标注前/中/后 + 案例库/校准/统计/对比）",
+  "action": {
+    "default_title": "打开轨迹标注工作台"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

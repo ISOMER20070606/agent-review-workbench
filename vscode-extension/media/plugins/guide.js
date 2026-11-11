@@ -133,7 +133,7 @@
 
   var IMG_BASE = (typeof window !== 'undefined' && window.__IMG_BASE) || '';
   function shot(id, cap){
-    return '<div class="gd-shot"><img src="' + IMG_BASE + 'docs/img/' + id + '.jpg" onerror="this.style.display=\'none\'" alt="' + id + '"><div class="cap">' + (cap || '') + '</div></div>';
+    return '<div class="gd-shot"><img src="' + IMG_BASE + 'docs/img/' + id + '.webp" onerror="this.style.display=\'none\'" alt="' + id + '"><div class="cap">' + (cap || '') + '</div></div>';
   }
   function titleOf(id){
     for (var i = 0; i < NAV.length; i++) for (var j = 0; j < NAV[i].items.length; j++) if (NAV[i].items[j].id === id) return NAV[i].items[j].title;
